@@ -34,5 +34,8 @@
     "tsc-watch": "^7.2.1",
     "tsx": "^4.23.10",
     "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
