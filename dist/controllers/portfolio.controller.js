@@ -58,14 +58,12 @@ const getPendingPortfolios = (req, res) => __awaiter(void 0, void 0, void 0, fun
 });
 exports.getPendingPortfolios = getPendingPortfolios;
 const reviewPortfolio = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _b;
+    var _b, _c, _d, _e, _f, _g, _h;
     try {
         const { id } = req.params;
-        const { feedback, scores } = req.body;
+        const feedback = req.body.feedback || req.body.notes || 'Artwork reviewed & approved by mentor.';
+        const skillScores = req.body.scores || req.body.skills || {};
         const mentorName = ((_b = req.user) === null || _b === void 0 ? void 0 : _b.name) || 'Admin Mentor';
-        if (!feedback || !scores) {
-            return res.status(400).json({ message: 'Feedback and scores are required.' });
-        }
         const portfolio = yield Portfolio.findByPk(id);
         if (!portfolio) {
             return res.status(404).json({ message: 'Portfolio not found' });
@@ -84,12 +82,12 @@ const reviewPortfolio = (req, res) => __awaiter(void 0, void 0, void 0, function
         // Update moving average for skills (simplified logic: just overwriting for MVP, or averaging)
         // For MVP, we'll just set it to the new score. A real app might do a moving average.
         yield userSkill.update({
-            resinBasics: scores.resinBasics || userSkill.resinBasics,
-            mixing: scores.mixing || userSkill.mixing,
-            colourTheory: scores.colourTheory || userSkill.colourTheory,
-            finishing: scores.finishing || userSkill.finishing,
-            creativity: scores.creativity || userSkill.creativity,
-            professionalQuality: scores.professionalQuality || userSkill.professionalQuality,
+            resinBasics: (_c = skillScores.resinBasics) !== null && _c !== void 0 ? _c : userSkill.resinBasics,
+            mixing: (_d = skillScores.mixing) !== null && _d !== void 0 ? _d : userSkill.mixing,
+            colourTheory: (_e = skillScores.colourTheory) !== null && _e !== void 0 ? _e : userSkill.colourTheory,
+            finishing: (_f = skillScores.finishing) !== null && _f !== void 0 ? _f : userSkill.finishing,
+            creativity: (_g = skillScores.creativity) !== null && _g !== void 0 ? _g : userSkill.creativity,
+            professionalQuality: (_h = skillScores.professionalQuality) !== null && _h !== void 0 ? _h : userSkill.professionalQuality,
         });
         // Add some XP for the review!
         const user = yield User.findByPk(portfolio.userId);

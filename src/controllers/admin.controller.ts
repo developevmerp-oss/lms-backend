@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import db from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
-const { User, Skill, Badge, UserBadge, Portfolio, Milestone, SalesRecord, Course, UserCourse, Notification, CommunityWin } = db;
+const { User, Skill, Badge, UserBadge, Portfolio, Milestone, SalesRecord, Course, UserCourse, Notification, CommunityWin, LevelTier } = db;
 
 // ===== STUDENT MANAGEMENT =====
 
@@ -137,11 +137,27 @@ export const deleteSalesRecord = async (req: AuthRequest, res: Response): Promis
 // ===== BADGE MANAGEMENT =====
 
 // GET all badges
+const DEFAULT_BADGES = [
+  { name: 'First Resin Pour', icon: '🎨', color: 'orange', description: 'Completed their first resin workshop project', pointsRequired: 100 },
+  { name: 'First Client Sale', icon: '💰', color: 'emerald', description: 'Sold their first art piece to a paying client', pointsRequired: 500 },
+  { name: 'Geode Master', icon: '💎', color: 'purple', description: 'Mastered 3D geode crystal inlays & agate shapes', pointsRequired: 2000 },
+  { name: 'Clock Artisan', icon: '⏰', color: 'amber', description: 'Handcrafted luxury roman mechanical wall clock', pointsRequired: 1500 },
+  { name: 'Streak Champion', icon: '🔥', color: 'rose', description: 'Maintained a 30-day active daily missions streak', pointsRequired: 1000 },
+  { name: 'Ocean Waves Specialist', icon: '🌊', color: 'cyan', description: 'Perfected white foam cell formation & sea gradients', pointsRequired: 1200 },
+  { name: 'Bridal Preservationist', icon: '💐', color: 'pink', description: 'Cast clear deep-pour wedding floral keepsake', pointsRequired: 3000 },
+  { name: 'Hall of Fame Creator', icon: '👑', color: 'yellow', description: 'Reached ₹50,000+ in total art career sales', pointsRequired: 10000 },
+];
+
 export const getAllBadges = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
-    const badges = await Badge.findAll();
+    let badges = await Badge.findAll();
+    if (!badges || badges.length === 0) {
+      await Badge.bulkCreate(DEFAULT_BADGES);
+      badges = await Badge.findAll();
+    }
     return res.status(200).json(badges);
   } catch (error) {
+    console.error('Error fetching badges:', error);
     return res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -152,14 +168,27 @@ export const awardBadge = async (req: AuthRequest, res: Response): Promise<any> 
     const { studentId } = req.params;
     const { badgeId } = req.body;
     const existing = await UserBadge.findOne({ where: { userId: studentId, badgeId } });
-    if (existing) return res.status(409).json({ message: 'Badge already awarded' });
+    if (existing) return res.status(409).json({ message: 'Badge already awarded to this student' });
     await UserBadge.create({ userId: studentId, badgeId });
-    return res.status(201).json({ message: 'Badge awarded' });
+    return res.status(201).json({ message: 'Badge awarded successfully' });
   } catch (error) {
     console.error('Error awarding badge:', error);
     return res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+// Remove badge from student
+export const removeBadgeFromStudent = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { studentId, badgeId } = req.params;
+    await UserBadge.destroy({ where: { userId: studentId, badgeId } });
+    return res.status(200).json({ message: 'Badge removed from student' });
+  } catch (error) {
+    console.error('Error removing badge:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 
 // ===== SKILL MANAGEMENT =====
 
@@ -296,5 +325,107 @@ export const deleteCommunityWin = async (req: AuthRequest, res: Response): Promi
     return res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+// ===== LEVEL & TIER SETTINGS MANAGEMENT =====
+
+const DEFAULT_LEVELS = [
+  { code: 'L0', name: 'Fast Start', minPoints: 0, maxPoints: 499, icon: '⚡', badgeColor: 'emerald', order: 0, description: 'Resin basics and first 5 creations' },
+  { code: 'L1', name: 'Silver Member', minPoints: 500, maxPoints: 4999, icon: '🥈', badgeColor: 'slate', order: 1, description: 'Core techniques and first client sale' },
+  { code: 'L2', name: 'Gold Member', minPoints: 5000, maxPoints: 9999, icon: '🏆', badgeColor: 'amber', order: 2, description: '₹25K–₹50K monthly revenue and custom orders' },
+  { code: 'L3', name: 'Diamond Club', minPoints: 10000, maxPoints: 49999, icon: '💎', badgeColor: 'cyan', order: 3, description: 'Scale beyond ₹50K/month and corporate contracts' },
+  { code: 'L3+', name: 'Masters Club', minPoints: 50000, maxPoints: null, icon: '👑', badgeColor: 'purple', order: 4, description: 'Offline city workshops and signature brand empire' },
+];
+
+// GET all configured level tiers (with auto-seeding if empty)
+export const getAllLevelTiers = async (req: Request, res: Response): Promise<any> => {
+  try {
+    let levels = await LevelTier.findAll({
+      order: [['minPoints', 'ASC'], ['order', 'ASC']]
+    });
+
+    if (!levels || levels.length === 0) {
+      // Auto-seed default levels
+      await LevelTier.bulkCreate(DEFAULT_LEVELS);
+      levels = await LevelTier.findAll({
+        order: [['minPoints', 'ASC'], ['order', 'ASC']]
+      });
+    }
+
+    return res.status(200).json(levels);
+  } catch (error) {
+    console.error('Error fetching level tiers:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// CREATE a new level tier
+export const createLevelTier = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { code, name, minPoints, maxPoints, icon, badgeColor, order, description } = req.body;
+
+    if (!code || !name || minPoints === undefined) {
+      return res.status(400).json({ message: 'Code, name, and minPoints are required' });
+    }
+
+    const tier = await LevelTier.create({
+      code,
+      name,
+      minPoints: Number(minPoints),
+      maxPoints: maxPoints !== undefined && maxPoints !== null && maxPoints !== '' ? Number(maxPoints) : null,
+      icon: icon || '⚡',
+      badgeColor: badgeColor || 'emerald',
+      order: Number(order) || 0,
+      description: description || ''
+    });
+
+    return res.status(201).json(tier);
+  } catch (error) {
+    console.error('Error creating level tier:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// UPDATE a level tier
+export const updateLevelTier = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { levelId } = req.params;
+    const { code, name, minPoints, maxPoints, icon, badgeColor, order, description } = req.body;
+
+    const tier = await LevelTier.findByPk(levelId);
+    if (!tier) return res.status(404).json({ message: 'Level tier not found' });
+
+    await tier.update({
+      code: code !== undefined ? code : tier.code,
+      name: name !== undefined ? name : tier.name,
+      minPoints: minPoints !== undefined ? Number(minPoints) : tier.minPoints,
+      maxPoints: maxPoints !== undefined ? (maxPoints !== null && maxPoints !== '' ? Number(maxPoints) : null) : tier.maxPoints,
+      icon: icon !== undefined ? icon : tier.icon,
+      badgeColor: badgeColor !== undefined ? badgeColor : tier.badgeColor,
+      order: order !== undefined ? Number(order) : tier.order,
+      description: description !== undefined ? description : tier.description
+    });
+
+    return res.status(200).json(tier);
+  } catch (error) {
+    console.error('Error updating level tier:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// DELETE a level tier
+export const deleteLevelTier = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { levelId } = req.params;
+    const tier = await LevelTier.findByPk(levelId);
+    if (!tier) return res.status(404).json({ message: 'Level tier not found' });
+
+    await tier.destroy();
+    return res.status(200).json({ message: 'Level tier deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting level tier:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 
 

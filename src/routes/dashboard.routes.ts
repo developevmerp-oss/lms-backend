@@ -1,8 +1,11 @@
 import { Router } from 'express';
-import { getAdminStats, getStudentStats, likeCommunityWin, commentCommunityWin, postCommunityWin } from '../controllers/dashboard.controller';
+import { getAdminStats, getStudentStats, likeCommunityWin, commentCommunityWin, postCommunityWin, getPublicLevelTiers } from '../controllers/dashboard.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 
 const router = Router();
+
+// Public / Student levels route
+router.get('/levels', getPublicLevelTiers);
 
 // Admin stats route
 router.get('/admin', authenticate, authorize(['admin']), getAdminStats);
@@ -16,3 +19,4 @@ router.post('/community-wins/:id/like', authenticate, likeCommunityWin);
 router.post('/community-wins/:id/comment', authenticate, commentCommunityWin);
 
 export default router;
+

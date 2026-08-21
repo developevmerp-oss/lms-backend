@@ -20,6 +20,7 @@ router.delete('/sales/:recordId', admin_controller_1.deleteSalesRecord);
 // Badges
 router.get('/badges', admin_controller_1.getAllBadges);
 router.post('/students/:studentId/badges', admin_controller_1.awardBadge);
+router.delete('/students/:studentId/badges/:badgeId', admin_controller_1.removeBadgeFromStudent);
 // Skills
 router.put('/students/:studentId/skills', admin_controller_1.updateStudentSkills);
 // Course Enrollment
@@ -31,4 +32,9 @@ router.get('/notifications', admin_controller_1.getAllNotifications);
 router.post('/community-wins', admin_controller_1.createCommunityWin);
 router.get('/community-wins', admin_controller_1.getAllCommunityWins);
 router.delete('/community-wins/:winId', admin_controller_1.deleteCommunityWin);
+// Level & Tier Settings
+router.get('/levels', admin_controller_1.getAllLevelTiers);
+router.post('/levels', admin_controller_1.createLevelTier);
+router.put('/levels/:levelId', admin_controller_1.updateLevelTier);
+router.delete('/levels/:levelId', admin_controller_1.deleteLevelTier);
 exports.default = router;

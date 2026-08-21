@@ -50,17 +50,15 @@ export const getPendingPortfolios = async (req: AuthRequest, res: Response): Pro
 export const reviewPortfolio = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const { id } = req.params;
-    const { feedback, scores } = req.body;
+    const feedback = req.body.feedback || req.body.notes || 'Artwork reviewed & approved by mentor.';
+    const skillScores = req.body.scores || req.body.skills || {};
     const mentorName = (req.user as any)?.name || 'Admin Mentor';
-
-    if (!feedback || !scores) {
-      return res.status(400).json({ message: 'Feedback and scores are required.' });
-    }
 
     const portfolio = await Portfolio.findByPk(id);
     if (!portfolio) {
       return res.status(404).json({ message: 'Portfolio not found' });
     }
+
 
     // Update Portfolio with feedback
     await portfolio.update({
@@ -78,12 +76,12 @@ export const reviewPortfolio = async (req: AuthRequest, res: Response): Promise<
     // Update moving average for skills (simplified logic: just overwriting for MVP, or averaging)
     // For MVP, we'll just set it to the new score. A real app might do a moving average.
     await userSkill.update({
-      resinBasics: scores.resinBasics || userSkill.resinBasics,
-      mixing: scores.mixing || userSkill.mixing,
-      colourTheory: scores.colourTheory || userSkill.colourTheory,
-      finishing: scores.finishing || userSkill.finishing,
-      creativity: scores.creativity || userSkill.creativity,
-      professionalQuality: scores.professionalQuality || userSkill.professionalQuality,
+      resinBasics: skillScores.resinBasics ?? userSkill.resinBasics,
+      mixing: skillScores.mixing ?? userSkill.mixing,
+      colourTheory: skillScores.colourTheory ?? userSkill.colourTheory,
+      finishing: skillScores.finishing ?? userSkill.finishing,
+      creativity: skillScores.creativity ?? userSkill.creativity,
+      professionalQuality: skillScores.professionalQuality ?? userSkill.professionalQuality,
     });
 
     // Add some XP for the review!

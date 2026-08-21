@@ -20,6 +20,7 @@ router.use('/dashboard', dashboardRoutes);
 router.use('/leaderboard', leaderboardRoutes);
 router.use('/certificates', certificateRoutes);
 router.use('/portfolio', portfolioRoutes);
+router.use('/portfolios', portfolioRoutes);
 router.use('/admin', adminRoutes);
 
 export default router;

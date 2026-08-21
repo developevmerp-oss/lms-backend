@@ -24,7 +24,7 @@ Portfolio.init({
         allowNull: false,
     },
     imageUrl: {
-        type: sequelize_1.DataTypes.STRING,
+        type: sequelize_1.DataTypes.TEXT,
         allowNull: false,
     },
     feedback: {

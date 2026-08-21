@@ -1,30 +1,44 @@
-import { Request, Response } from 'express';
+﻿import { Request, Response } from 'express';
 import db from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
-const { User, Course, Submission, Reward, Skill, Badge, Portfolio, Milestone, SalesRecord, Notification } = db;
+const { User, Course, Submission, Skill, Badge, Portfolio, Milestone, SalesRecord, Notification } = db;
+
+// In-memory cache for level tiers (barely changes, no need to re-query every request)
+let cachedLevelTiers: any[] | null = null;
+let levelTierCacheAt = 0;
+const LEVEL_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function getLevelTiers() {
+  const now = Date.now();
+  if (cachedLevelTiers && (now - levelTierCacheAt) < LEVEL_CACHE_TTL_MS) {
+    return cachedLevelTiers;
+  }
+  let tiers = await db.LevelTier.findAll({ order: [['minPoints', 'ASC'], ['order', 'ASC']] });
+  if (!tiers || tiers.length === 0) {
+    const DEFAULT_LEVELS = [
+      { code: 'L0', name: 'Fast Start', minPoints: 0, maxPoints: 499, icon: '⚡', badgeColor: 'emerald', order: 0, description: 'Resin basics and first 5 creations' },
+      { code: 'L1', name: 'Silver Member', minPoints: 500, maxPoints: 4999, icon: '🥈', badgeColor: 'slate', order: 1, description: 'Core techniques and first client sale' },
+      { code: 'L2', name: 'Gold Member', minPoints: 5000, maxPoints: 9999, icon: '🏆', badgeColor: 'amber', order: 2, description: '₹25K–₹50K monthly revenue and custom orders' },
+      { code: 'L3', name: 'Diamond Club', minPoints: 10000, maxPoints: 49999, icon: '💎', badgeColor: 'cyan', order: 3, description: 'Scale beyond ₹50K/month and corporate contracts' },
+      { code: 'L3+', name: 'Masters Club', minPoints: 50000, maxPoints: null, icon: '👑', badgeColor: 'purple', order: 4, description: 'Offline city workshops and signature brand empire' },
+    ];
+    await db.LevelTier.bulkCreate(DEFAULT_LEVELS);
+    tiers = await db.LevelTier.findAll({ order: [['minPoints', 'ASC'], ['order', 'ASC']] });
+  }
+  cachedLevelTiers = tiers;
+  levelTierCacheAt = now;
+  return tiers;
+}
 
 export const getAdminStats = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
-    // Total Students
-    const totalStudents = await User.count({ where: { role: 'student' } });
-
-    // Active Courses
-    const activeCourses = await Course.count();
-
-    // Pending Assignments
-    const pendingAssignments = await Submission.count({ where: { status: 'pending' } });
-
-    // Rewards Distributed (Mocked for now since UserReward pivot doesn't exist yet)
-    // Could also just query total rewards available for now or count a redeemed log
-    const rewardsDistributed = 0; 
-
-    res.status(200).json({
-      totalStudents,
-      activeCourses,
-      pendingAssignments,
-      rewardsDistributed
-    });
+    const [totalStudents, activeCourses, pendingAssignments] = await Promise.all([
+      User.count({ where: { role: 'student' } }),
+      Course.count(),
+      Submission.count({ where: { status: 'pending' } }),
+    ]);
+    res.status(200).json({ totalStudents, activeCourses, pendingAssignments, rewardsDistributed: 0 });
   } catch (error) {
     console.error('Error fetching admin stats:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -34,47 +48,44 @@ export const getAdminStats = async (req: AuthRequest, res: Response): Promise<an
 export const getStudentStats = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const studentId = req.user?.id;
-    if (!studentId) {
-      return res.status(401).json({ message: 'Unauthorized' });
+    if (!studentId) return res.status(401).json({ message: 'Unauthorized' });
+
+    // Fire all independent queries in PARALLEL
+    const [student, allCourses, communityWins, levelTiers] = await Promise.all([
+      User.findByPk(studentId, {
+        attributes: { exclude: ['password'] },
+        include: [
+          { model: Skill, as: 'skills' },
+          { model: Badge, as: 'badges' },
+          { model: Portfolio, as: 'portfolios', attributes: ['id', 'title', 'technique', 'imageUrl', 'feedback', 'createdAt'] },
+          { model: Milestone, as: 'milestones', attributes: ['id', 'name', 'completed', 'completedAt', 'order'] },
+          { model: SalesRecord, as: 'salesRecords', attributes: ['id', 'amount', 'productName', 'date'] },
+          { model: Course, as: 'courses', attributes: ['id', 'title', 'description'] },
+          { model: Notification, as: 'notifications', attributes: ['id', 'title', 'message', 'isRead', 'createdAt'] },
+        ]
+      }),
+      Course.findAll({ attributes: ['id', 'title', 'description', 'image'] }),
+      db.CommunityWin.findAll({ order: [['createdAt', 'DESC']], limit: 5 }),
+      getLevelTiers(),
+    ]);
+
+    if (!student) return res.status(404).json({ message: 'Student not found' });
+
+    let currentTier = levelTiers[0];
+    for (const tier of levelTiers) {
+      if ((student.points || 0) >= tier.minPoints) currentTier = tier;
     }
 
-    const student = await User.findByPk(studentId, {
-      include: [
-        { model: Skill, as: 'skills' },
-        { model: Badge, as: 'badges' },
-        { model: Portfolio, as: 'portfolios' },
-        { model: Milestone, as: 'milestones' },
-        { model: SalesRecord, as: 'salesRecords' },
-        { model: Course, as: 'courses' },
-        { model: Notification, as: 'notifications' }
-      ]
-    });
-    if (!student) {
-      return res.status(404).json({ message: 'Student not found' });
-    }
-
-    // Fetch ALL courses to determine what is locked
-    const allCourses = await Course.findAll();
-    
-    // Fetch community wins
-    const communityWins = await db.CommunityWin.findAll({
-      order: [['createdAt', 'DESC']],
-      limit: 5
-    });
-
-    // Compute next goal
-    // Try to find the first incomplete milestone
     const nextMilestone = student.milestones?.find((m: any) => !m.completed);
-    let nextGoal = 'Complete pending missions';
-    if (nextMilestone) {
-      nextGoal = `Next Milestone: ${nextMilestone.name}`;
-    }
+    const nextGoal = nextMilestone ? `Next Milestone: ${nextMilestone.name}` : 'Complete pending missions';
 
     res.status(200).json({
       points: student.points,
       xpPoints: student.xpPoints,
       streak: student.streak,
-      membershipLevel: student.membershipLevel,
+      membershipLevel: currentTier?.name || student.membershipLevel,
+      currentTier,
+      levelTiers,
       rank: student.rank,
       skills: student.skills,
       badges: student.badges,
@@ -93,12 +104,21 @@ export const getStudentStats = async (req: AuthRequest, res: Response): Promise<
   }
 };
 
+export const getPublicLevelTiers = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const levels = await getLevelTiers();
+    return res.status(200).json(levels);
+  } catch (error) {
+    console.error('Error fetching public level tiers:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 export const likeCommunityWin = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const { id } = req.params;
     const win = await db.CommunityWin.findByPk(id);
     if (!win) return res.status(404).json({ message: 'Win not found' });
-    
     win.likes += 1;
     await win.save();
     return res.status(200).json(win);
@@ -113,18 +133,11 @@ export const commentCommunityWin = async (req: AuthRequest, res: Response): Prom
     const { id } = req.params;
     const { text } = req.body;
     const authorName = (req.user as any)?.name || 'Student';
-
     if (!text) return res.status(400).json({ message: 'Comment text is required' });
-
     const win = await db.CommunityWin.findByPk(id);
     if (!win) return res.status(404).json({ message: 'Win not found' });
-    
-    const newComment = { author: authorName, text };
-    // JSON arrays in sequelize need to be reassigned to trigger an update sometimes
-    const currentComments = win.comments || [];
-    win.comments = [...currentComments, newComment];
+    win.comments = [...(win.comments || []), { author: authorName, text }];
     await win.save();
-
     return res.status(200).json(win);
   } catch (error) {
     console.error('Error commenting win:', error);
@@ -136,16 +149,8 @@ export const postCommunityWin = async (req: AuthRequest, res: Response): Promise
   try {
     const { achievement } = req.body;
     const studentName = (req.user as any)?.name || 'Student';
-
     if (!achievement) return res.status(400).json({ message: 'Achievement text is required' });
-
-    const win = await db.CommunityWin.create({
-      studentName,
-      achievement,
-      likes: 0,
-      timeAgo: 'Just now'
-    });
-
+    const win = await db.CommunityWin.create({ studentName, achievement, likes: 0, timeAgo: 'Just now' });
     return res.status(201).json(win);
   } catch (error) {
     console.error('Error posting community win:', error);

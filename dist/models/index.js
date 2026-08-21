@@ -22,6 +22,7 @@ const milestone_1 = __importDefault(require("./milestone"));
 const salesRecord_1 = __importDefault(require("./salesRecord"));
 const notification_1 = __importDefault(require("./notification"));
 const communityWin_1 = __importDefault(require("./communityWin"));
+const levelTier_1 = __importDefault(require("./levelTier"));
 const db = {};
 db.Sequelize = sequelize_1.Sequelize;
 db.sequelize = database_1.sequelize;
@@ -42,6 +43,7 @@ db.Milestone = milestone_1.default;
 db.SalesRecord = salesRecord_1.default;
 db.Notification = notification_1.default;
 db.CommunityWin = communityWin_1.default;
+db.LevelTier = levelTier_1.default;
 // Setup manual associations that aren't defined in the classes
 user_1.default.hasOne(skill_1.default, { foreignKey: 'userId', as: 'skills' });
 skill_1.default.belongsTo(user_1.default, { foreignKey: 'userId' });

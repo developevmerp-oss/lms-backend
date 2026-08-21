@@ -12,9 +12,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteCommunityWin = exports.getAllCommunityWins = exports.createCommunityWin = exports.getAllNotifications = exports.sendNotification = exports.enrollStudentInCourse = exports.updateStudentSkills = exports.awardBadge = exports.getAllBadges = exports.deleteSalesRecord = exports.addSalesRecord = exports.deleteMilestone = exports.updateMilestone = exports.addMilestone = exports.updateStudent = exports.getStudentById = exports.getAllStudents = void 0;
+exports.deleteLevelTier = exports.updateLevelTier = exports.createLevelTier = exports.getAllLevelTiers = exports.deleteCommunityWin = exports.getAllCommunityWins = exports.createCommunityWin = exports.getAllNotifications = exports.sendNotification = exports.enrollStudentInCourse = exports.updateStudentSkills = exports.removeBadgeFromStudent = exports.awardBadge = exports.getAllBadges = exports.deleteSalesRecord = exports.addSalesRecord = exports.deleteMilestone = exports.updateMilestone = exports.addMilestone = exports.updateStudent = exports.getStudentById = exports.getAllStudents = void 0;
 const models_1 = __importDefault(require("../models"));
-const { User, Skill, Badge, UserBadge, Portfolio, Milestone, SalesRecord, Course, UserCourse, Notification, CommunityWin } = models_1.default;
+const { User, Skill, Badge, UserBadge, Portfolio, Milestone, SalesRecord, Course, UserCourse, Notification, CommunityWin, LevelTier } = models_1.default;
 // ===== STUDENT MANAGEMENT =====
 // GET all students with full data
 const getAllStudents = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -155,12 +155,27 @@ const deleteSalesRecord = (req, res) => __awaiter(void 0, void 0, void 0, functi
 exports.deleteSalesRecord = deleteSalesRecord;
 // ===== BADGE MANAGEMENT =====
 // GET all badges
+const DEFAULT_BADGES = [
+    { name: 'First Resin Pour', icon: '🎨', color: 'orange', description: 'Completed their first resin workshop project', pointsRequired: 100 },
+    { name: 'First Client Sale', icon: '💰', color: 'emerald', description: 'Sold their first art piece to a paying client', pointsRequired: 500 },
+    { name: 'Geode Master', icon: '💎', color: 'purple', description: 'Mastered 3D geode crystal inlays & agate shapes', pointsRequired: 2000 },
+    { name: 'Clock Artisan', icon: '⏰', color: 'amber', description: 'Handcrafted luxury roman mechanical wall clock', pointsRequired: 1500 },
+    { name: 'Streak Champion', icon: '🔥', color: 'rose', description: 'Maintained a 30-day active daily missions streak', pointsRequired: 1000 },
+    { name: 'Ocean Waves Specialist', icon: '🌊', color: 'cyan', description: 'Perfected white foam cell formation & sea gradients', pointsRequired: 1200 },
+    { name: 'Bridal Preservationist', icon: '💐', color: 'pink', description: 'Cast clear deep-pour wedding floral keepsake', pointsRequired: 3000 },
+    { name: 'Hall of Fame Creator', icon: '👑', color: 'yellow', description: 'Reached ₹50,000+ in total art career sales', pointsRequired: 10000 },
+];
 const getAllBadges = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const badges = yield Badge.findAll();
+        let badges = yield Badge.findAll();
+        if (!badges || badges.length === 0) {
+            yield Badge.bulkCreate(DEFAULT_BADGES);
+            badges = yield Badge.findAll();
+        }
         return res.status(200).json(badges);
     }
     catch (error) {
+        console.error('Error fetching badges:', error);
         return res.status(500).json({ message: 'Internal server error' });
     }
 });
@@ -172,9 +187,9 @@ const awardBadge = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         const { badgeId } = req.body;
         const existing = yield UserBadge.findOne({ where: { userId: studentId, badgeId } });
         if (existing)
-            return res.status(409).json({ message: 'Badge already awarded' });
+            return res.status(409).json({ message: 'Badge already awarded to this student' });
         yield UserBadge.create({ userId: studentId, badgeId });
-        return res.status(201).json({ message: 'Badge awarded' });
+        return res.status(201).json({ message: 'Badge awarded successfully' });
     }
     catch (error) {
         console.error('Error awarding badge:', error);
@@ -182,6 +197,19 @@ const awardBadge = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     }
 });
 exports.awardBadge = awardBadge;
+// Remove badge from student
+const removeBadgeFromStudent = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { studentId, badgeId } = req.params;
+        yield UserBadge.destroy({ where: { userId: studentId, badgeId } });
+        return res.status(200).json({ message: 'Badge removed from student' });
+    }
+    catch (error) {
+        console.error('Error removing badge:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.removeBadgeFromStudent = removeBadgeFromStudent;
 // ===== SKILL MANAGEMENT =====
 // UPDATE student skills
 const updateStudentSkills = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -314,3 +342,99 @@ const deleteCommunityWin = (req, res) => __awaiter(void 0, void 0, void 0, funct
     }
 });
 exports.deleteCommunityWin = deleteCommunityWin;
+// ===== LEVEL & TIER SETTINGS MANAGEMENT =====
+const DEFAULT_LEVELS = [
+    { code: 'L0', name: 'Fast Start', minPoints: 0, maxPoints: 499, icon: '⚡', badgeColor: 'emerald', order: 0, description: 'Resin basics and first 5 creations' },
+    { code: 'L1', name: 'Silver Member', minPoints: 500, maxPoints: 4999, icon: '🥈', badgeColor: 'slate', order: 1, description: 'Core techniques and first client sale' },
+    { code: 'L2', name: 'Gold Member', minPoints: 5000, maxPoints: 9999, icon: '🏆', badgeColor: 'amber', order: 2, description: '₹25K–₹50K monthly revenue and custom orders' },
+    { code: 'L3', name: 'Diamond Club', minPoints: 10000, maxPoints: 49999, icon: '💎', badgeColor: 'cyan', order: 3, description: 'Scale beyond ₹50K/month and corporate contracts' },
+    { code: 'L3+', name: 'Masters Club', minPoints: 50000, maxPoints: null, icon: '👑', badgeColor: 'purple', order: 4, description: 'Offline city workshops and signature brand empire' },
+];
+// GET all configured level tiers (with auto-seeding if empty)
+const getAllLevelTiers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        let levels = yield LevelTier.findAll({
+            order: [['minPoints', 'ASC'], ['order', 'ASC']]
+        });
+        if (!levels || levels.length === 0) {
+            // Auto-seed default levels
+            yield LevelTier.bulkCreate(DEFAULT_LEVELS);
+            levels = yield LevelTier.findAll({
+                order: [['minPoints', 'ASC'], ['order', 'ASC']]
+            });
+        }
+        return res.status(200).json(levels);
+    }
+    catch (error) {
+        console.error('Error fetching level tiers:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.getAllLevelTiers = getAllLevelTiers;
+// CREATE a new level tier
+const createLevelTier = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { code, name, minPoints, maxPoints, icon, badgeColor, order, description } = req.body;
+        if (!code || !name || minPoints === undefined) {
+            return res.status(400).json({ message: 'Code, name, and minPoints are required' });
+        }
+        const tier = yield LevelTier.create({
+            code,
+            name,
+            minPoints: Number(minPoints),
+            maxPoints: maxPoints !== undefined && maxPoints !== null && maxPoints !== '' ? Number(maxPoints) : null,
+            icon: icon || '⚡',
+            badgeColor: badgeColor || 'emerald',
+            order: Number(order) || 0,
+            description: description || ''
+        });
+        return res.status(201).json(tier);
+    }
+    catch (error) {
+        console.error('Error creating level tier:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.createLevelTier = createLevelTier;
+// UPDATE a level tier
+const updateLevelTier = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { levelId } = req.params;
+        const { code, name, minPoints, maxPoints, icon, badgeColor, order, description } = req.body;
+        const tier = yield LevelTier.findByPk(levelId);
+        if (!tier)
+            return res.status(404).json({ message: 'Level tier not found' });
+        yield tier.update({
+            code: code !== undefined ? code : tier.code,
+            name: name !== undefined ? name : tier.name,
+            minPoints: minPoints !== undefined ? Number(minPoints) : tier.minPoints,
+            maxPoints: maxPoints !== undefined ? (maxPoints !== null && maxPoints !== '' ? Number(maxPoints) : null) : tier.maxPoints,
+            icon: icon !== undefined ? icon : tier.icon,
+            badgeColor: badgeColor !== undefined ? badgeColor : tier.badgeColor,
+            order: order !== undefined ? Number(order) : tier.order,
+            description: description !== undefined ? description : tier.description
+        });
+        return res.status(200).json(tier);
+    }
+    catch (error) {
+        console.error('Error updating level tier:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.updateLevelTier = updateLevelTier;
+// DELETE a level tier
+const deleteLevelTier = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { levelId } = req.params;
+        const tier = yield LevelTier.findByPk(levelId);
+        if (!tier)
+            return res.status(404).json({ message: 'Level tier not found' });
+        yield tier.destroy();
+        return res.status(200).json({ message: 'Level tier deleted successfully' });
+    }
+    catch (error) {
+        console.error('Error deleting level tier:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.deleteLevelTier = deleteLevelTier;

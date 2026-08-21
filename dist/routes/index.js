@@ -22,5 +22,6 @@ router.use('/dashboard', dashboard_routes_1.default);
 router.use('/leaderboard', leaderboard_routes_1.default);
 router.use('/certificates', certificate_routes_1.default);
 router.use('/portfolio', portfolio_routes_1.default);
+router.use('/portfolios', portfolio_routes_1.default);
 router.use('/admin', admin_routes_1.default);
 exports.default = router;

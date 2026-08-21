@@ -11,6 +11,7 @@ import {
   deleteSalesRecord,
   getAllBadges,
   awardBadge,
+  removeBadgeFromStudent,
   updateStudentSkills,
   enrollStudentInCourse,
   sendNotification,
@@ -18,6 +19,10 @@ import {
   createCommunityWin,
   getAllCommunityWins,
   deleteCommunityWin,
+  getAllLevelTiers,
+  createLevelTier,
+  updateLevelTier,
+  deleteLevelTier,
 } from '../controllers/admin.controller';
 
 const router = Router();
@@ -42,6 +47,7 @@ router.delete('/sales/:recordId', deleteSalesRecord);
 // Badges
 router.get('/badges', getAllBadges);
 router.post('/students/:studentId/badges', awardBadge);
+router.delete('/students/:studentId/badges/:badgeId', removeBadgeFromStudent);
 
 // Skills
 router.put('/students/:studentId/skills', updateStudentSkills);
@@ -58,4 +64,11 @@ router.post('/community-wins', createCommunityWin);
 router.get('/community-wins', getAllCommunityWins);
 router.delete('/community-wins/:winId', deleteCommunityWin);
 
+// Level & Tier Settings
+router.get('/levels', getAllLevelTiers);
+router.post('/levels', createLevelTier);
+router.put('/levels/:levelId', updateLevelTier);
+router.delete('/levels/:levelId', deleteLevelTier);
+
 export default router;
+

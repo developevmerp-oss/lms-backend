@@ -92,7 +92,7 @@ class User extends Model<UserAttributes, UserCreationAttributes> implements User
       allowNull: true,
     },
     avatarUrl: {
-      type: DataTypes.STRING,
+      type: DataTypes.TEXT,
       allowNull: true,
     },
   },

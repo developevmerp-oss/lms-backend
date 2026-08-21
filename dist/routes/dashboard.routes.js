@@ -4,6 +4,8 @@ const express_1 = require("express");
 const dashboard_controller_1 = require("../controllers/dashboard.controller");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const router = (0, express_1.Router)();
+// Public / Student levels route
+router.get('/levels', dashboard_controller_1.getPublicLevelTiers);
 // Admin stats route
 router.get('/admin', auth_middleware_1.authenticate, (0, auth_middleware_1.authorize)(['admin']), dashboard_controller_1.getAdminStats);
 // Student stats route
