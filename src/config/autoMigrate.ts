@@ -54,6 +54,7 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
     `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "streak" INTEGER DEFAULT 0;`,
     `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "rank" VARCHAR(255) DEFAULT 'Beginner';`,
     `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "xpPoints" INTEGER DEFAULT 0;`,
+    `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "lastRoutineDate" VARCHAR(50);`,
 
     // --- PORTFOLIOS TABLE ---
     `ALTER TABLE "Portfolios" ADD COLUMN IF NOT EXISTS "imageUrl" TEXT;`,

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getAdminStats, getStudentStats, likeCommunityWin, commentCommunityWin, postCommunityWin, getPublicLevelTiers } from '../controllers/dashboard.controller';
+import { getAdminStats, getStudentStats, likeCommunityWin, commentCommunityWin, postCommunityWin, getPublicLevelTiers, completeDailyRoutine } from '../controllers/dashboard.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -12,6 +12,9 @@ router.get('/admin', authenticate, authorize(['admin']), getAdminStats);
 
 // Student stats route
 router.get('/student', authenticate, authorize(['student']), getStudentStats);
+
+// 6-Habit Daily Routine Completion route
+router.post('/student/routine', authenticate, completeDailyRoutine);
 
 // Community Win interactions (allowed for both students and admins ideally, but usually students use dashboard)
 router.post('/community-wins', authenticate, postCommunityWin);

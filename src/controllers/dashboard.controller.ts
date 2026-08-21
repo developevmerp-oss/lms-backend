@@ -157,3 +157,50 @@ export const postCommunityWin = async (req: AuthRequest, res: Response): Promise
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+// 6-Step Daily Routine Completion API (+10 XP & keeps Streak active)
+export const completeDailyRoutine = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const studentId = req.user?.id;
+    if (!studentId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const student = await User.findByPk(studentId);
+    if (!student) return res.status(404).json({ message: 'Student not found' });
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    if ((student as any).lastRoutineDate === todayStr) {
+      return res.status(200).json({
+        success: true,
+        alreadyCompletedToday: true,
+        streak: student.streak,
+        points: student.points,
+        message: 'Daily routine already completed for today!'
+      });
+    }
+
+    // First time completing today: increment streak & award +10 XP
+    const newStreak = (student.streak || 0) + 1;
+    const newPoints = (student.points || 0) + 10;
+    const newXp = (student.xpPoints || 0) + 10;
+
+    await student.update({
+      streak: newStreak,
+      points: newPoints,
+      xpPoints: newXp,
+      lastRoutineDate: todayStr
+    } as any);
+
+    return res.status(200).json({
+      success: true,
+      alreadyCompletedToday: false,
+      streak: newStreak,
+      points: newPoints,
+      xpAwarded: 10,
+      message: 'Awesome job! +10 XP awarded and streak kept active!'
+    });
+  } catch (error) {
+    console.error('Error completing daily routine:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};

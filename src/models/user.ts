@@ -18,6 +18,7 @@ export interface UserAttributes {
   phone?: string;
   bio?: string;
   avatarUrl?: string;
+  lastRoutineDate?: string;
 
   createdAt?: Date;
   updatedAt?: Date;
@@ -93,6 +94,10 @@ class User extends Model<UserAttributes, UserCreationAttributes> implements User
     },
     avatarUrl: {
       type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    lastRoutineDate: {
+      type: DataTypes.STRING,
       allowNull: true,
     },
   },
