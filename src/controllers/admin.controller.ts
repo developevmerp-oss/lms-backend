@@ -329,11 +329,11 @@ export const deleteCommunityWin = async (req: AuthRequest, res: Response): Promi
 // ===== LEVEL & TIER SETTINGS MANAGEMENT =====
 
 const DEFAULT_LEVELS = [
-  { code: 'L0', name: 'Fast Start', minPoints: 0, maxPoints: 499, icon: '⚡', badgeColor: 'emerald', order: 0, description: 'Resin basics and first 5 creations' },
-  { code: 'L1', name: 'Silver Member', minPoints: 500, maxPoints: 4999, icon: '🥈', badgeColor: 'slate', order: 1, description: 'Core techniques and first client sale' },
-  { code: 'L2', name: 'Gold Member', minPoints: 5000, maxPoints: 9999, icon: '🏆', badgeColor: 'amber', order: 2, description: '₹25K–₹50K monthly revenue and custom orders' },
-  { code: 'L3', name: 'Diamond Club', minPoints: 10000, maxPoints: 49999, icon: '💎', badgeColor: 'cyan', order: 3, description: 'Scale beyond ₹50K/month and corporate contracts' },
-  { code: 'L3+', name: 'Masters Club', minPoints: 50000, maxPoints: null, icon: '👑', badgeColor: 'purple', order: 4, description: 'Offline city workshops and signature brand empire' },
+  { code: 'L0', name: 'Fast Track: Resin FastStart Bundle', minPoints: 0, maxPoints: 499, icon: '⚡', badgeColor: 'emerald', order: 0, description: 'Foundations, chemistry, and first creations' },
+  { code: 'L1', name: 'Silver Membership: Explore Membership', minPoints: 500, maxPoints: 4999, icon: '🥈', badgeColor: 'slate', order: 1, description: 'Core techniques, first client sale, and portfolio building' },
+  { code: 'L2', name: 'Gold Membership: Master Membership', minPoints: 5000, maxPoints: 9999, icon: '🏆', badgeColor: 'amber', order: 2, description: 'High-ticket geode clocks, bridal preservation, and consistent revenue' },
+  { code: 'L3', name: 'Diamond Membership: Renaissance Certification', minPoints: 10000, maxPoints: 49999, icon: '💎', badgeColor: 'cyan', order: 3, description: 'Scale beyond ₹50K/month, furniture river tables, and corporate orders' },
+  { code: 'L3+', name: 'Masters Club: Artistry Pinnacle', minPoints: 50000, maxPoints: null, icon: '👑', badgeColor: 'purple', order: 4, description: 'Offline city workshops, mentorship, and signature brand empire' },
 ];
 
 // GET all configured level tiers (with auto-seeding if empty)
