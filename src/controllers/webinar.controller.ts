@@ -48,6 +48,7 @@ export const getNextUpcomingWebinar = async (_req: Request, res: Response): Prom
           zoomJoinUrl: 'Emailed directly upon registration',
           whatsappGroupUrl: 'https://chat.whatsapp.com/sample-art-webinar-vip',
           totalSeats: 500,
+          registeredCount: 0,
           isDefault: true,
         },
       });
@@ -79,21 +80,19 @@ export const getNextUpcomingWebinar = async (_req: Request, res: Response): Prom
   }
 };
 
-// Public: Get Dynamic Recent Registrations for Social Proof Notification Pill
+// Public: Get Dynamic Recent Registrations for Social Proof Notification Pill (100% Real from DB)
 export const getRecentRegistrations = async (_req: Request, res: Response): Promise<void> => {
   try {
     const recentRows = await WebinarRegistration.findAll({
       order: [['createdAt', 'DESC']],
-      limit: 15,
+      limit: 20,
       attributes: ['name', 'city', 'createdAt'],
     });
 
-    const fallbackCities = ['Ahmedabad', 'Mumbai', 'Bengaluru', 'Pune', 'Delhi NCR', 'Hyderabad', 'Jaipur', 'Surat', 'Kolkata', 'Chennai'];
-
-    const items = recentRows.map((r, idx) => {
+    const items = recentRows.map((r) => {
       const parts = (r.name || 'Student').trim().split(' ');
       const formattedName = parts.length > 1 ? `${parts[0]} ${parts[1][0]}.` : parts[0];
-      const city = r.city || fallbackCities[idx % fallbackCities.length];
+      const city = r.city || 'India';
       const time = formatRelativeTime(r.createdAt || new Date());
 
       return {
@@ -102,19 +101,6 @@ export const getRecentRegistrations = async (_req: Request, res: Response): Prom
         time,
       };
     });
-
-    if (items.length < 5) {
-      const defaultSeeds = [
-        { name: 'Anil P.', city: 'Ahmedabad', time: '3 minutes ago' },
-        { name: 'Priya S.', city: 'Mumbai', time: '7 minutes ago' },
-        { name: 'Sneha K.', city: 'Bengaluru', time: '11 minutes ago' },
-        { name: 'Kavita G.', city: 'Ahmedabad', time: '18 minutes ago' },
-        { name: 'Ritu M.', city: 'Pune', time: '24 minutes ago' },
-        { name: 'Deepika T.', city: 'Hyderabad', time: '31 minutes ago' },
-      ];
-      res.status(200).json({ success: true, data: [...items, ...defaultSeeds] });
-      return;
-    }
 
     res.status(200).json({ success: true, data: items });
   } catch (error: any) {
@@ -353,7 +339,7 @@ export const getAllRegistrations = async (req: Request, res: Response): Promise<
   }
 };
 
-// Public: Get Scarcity & Overall Stats (Dynamically calculates claimed seats and percentage based on active event)
+// Public: Get 100% Real Scarcity & Registrations Stats from Database
 export const getWebinarStats = async (_req: Request, res: Response): Promise<void> => {
   try {
     const totalCount = await WebinarRegistration.count();
@@ -368,17 +354,17 @@ export const getWebinarStats = async (_req: Request, res: Response): Promise<voi
     });
 
     const totalSeats = activeEvent?.totalSeats || 500;
-    let eventRegCount = 0;
+    let claimedSeats = 0;
+
     if (activeEvent) {
-      eventRegCount = await WebinarRegistration.count({ where: { webinarEventId: activeEvent.id } });
+      claimedSeats = await WebinarRegistration.count({ where: { webinarEventId: activeEvent.id } });
+    } else {
+      claimedSeats = totalCount;
     }
 
-    // Dynamic claimed calculation:
-    // Base 82% room full + real database registrations
-    const baseClaimed = Math.floor(totalSeats * 0.82);
-    const claimedSeats = Math.min(totalSeats - 6, baseClaimed + eventRegCount + (totalCount % 12));
-    const seatsRemaining = Math.max(6, totalSeats - claimedSeats);
-    const percentFull = Math.min(98, Math.max(76, Math.round((claimedSeats / totalSeats) * 100)));
+    // Exact database numbers
+    const seatsRemaining = Math.max(0, totalSeats - claimedSeats);
+    const percentFull = totalSeats > 0 ? Math.min(100, Math.round((claimedSeats / totalSeats) * 100)) : 0;
 
     res.status(200).json({
       success: true,
