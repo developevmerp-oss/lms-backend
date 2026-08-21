@@ -8,6 +8,20 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
   console.log('🔄 Checking database schema and running auto-migrations...');
 
   const migrationQueries = [
+    // --- WEBINAR REGISTRATIONS TABLE ---
+    `CREATE TABLE IF NOT EXISTS "WebinarRegistrations" (
+      "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "name" VARCHAR(255) NOT NULL,
+      "email" VARCHAR(255) NOT NULL,
+      "phone" VARCHAR(255) NOT NULL,
+      "challenge" TEXT,
+      "source" VARCHAR(255) DEFAULT 'organic',
+      "attended" BOOLEAN DEFAULT false,
+      "notes" TEXT,
+      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );`,
+
     // --- USERS TABLE ---
     `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "avatarUrl" TEXT;`,
     `ALTER TABLE "Users" ALTER COLUMN "avatarUrl" TYPE TEXT;`,
@@ -49,19 +63,15 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
     `CREATE INDEX IF NOT EXISTS "idx_users_email" ON "Users" ("email");`,
     `CREATE INDEX IF NOT EXISTS "idx_users_role" ON "Users" ("role");`,
     `CREATE INDEX IF NOT EXISTS "idx_users_points" ON "Users" ("points" DESC);`,
-    `CREATE INDEX IF NOT EXISTS "idx_submissions_status" ON "Submissions" ("status");`,
-    `CREATE INDEX IF NOT EXISTS "idx_portfolios_userid" ON "Portfolios" ("userId");`,
-    `CREATE INDEX IF NOT EXISTS "idx_milestones_userid" ON "Milestones" ("userId");`,
-    `CREATE INDEX IF NOT EXISTS "idx_salesrecords_userid" ON "SalesRecords" ("userId");`,
-    `CREATE INDEX IF NOT EXISTS "idx_notifications_userid" ON "Notifications" ("userId");`,
+    `CREATE INDEX IF NOT EXISTS "idx_webinar_email" ON "WebinarRegistrations" ("email");`,
+    `CREATE INDEX IF NOT EXISTS "idx_webinar_phone" ON "WebinarRegistrations" ("phone");`,
+    `CREATE INDEX IF NOT EXISTS "idx_webinar_created" ON "WebinarRegistrations" ("createdAt" DESC);`,
   ];
 
   try {
-    // Run all migrations in a single batch for lightning-fast startup
     const combinedSql = migrationQueries.join('\n');
     await sequelize.query(combinedSql);
   } catch (err: any) {
-    // If batch has table-not-found, fallback individually
     for (const query of migrationQueries) {
       try {
         await sequelize.query(query);

@@ -19,6 +19,7 @@ import SalesRecord from './salesRecord';
 import Notification from './notification';
 import CommunityWin from './communityWin';
 import LevelTier from './levelTier';
+import WebinarRegistration from './webinarRegistration';
 
 const db: any = {};
 
@@ -44,6 +45,7 @@ db.SalesRecord = SalesRecord;
 db.Notification = Notification;
 db.CommunityWin = CommunityWin;
 db.LevelTier = LevelTier;
+db.WebinarRegistration = WebinarRegistration;
 
 // Setup manual associations that aren't defined in the classes
 User.hasOne(Skill, { foreignKey: 'userId', as: 'skills' });

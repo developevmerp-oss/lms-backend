@@ -9,6 +9,7 @@ import leaderboardRoutes from './leaderboard.routes';
 import certificateRoutes from './certificate.routes';
 import portfolioRoutes from './portfolio.routes';
 import adminRoutes from './admin.routes';
+import webinarRoutes from './webinar.routes';
 
 const router = Router();
 
@@ -22,5 +23,6 @@ router.use('/certificates', certificateRoutes);
 router.use('/portfolio', portfolioRoutes);
 router.use('/portfolios', portfolioRoutes);
 router.use('/admin', adminRoutes);
+router.use('/webinar', webinarRoutes);
 
 export default router;
