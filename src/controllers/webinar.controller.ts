@@ -22,20 +22,18 @@ export const getNextUpcomingWebinar = async (_req: Request, res: Response): Prom
   try {
     const now = new Date();
 
-    // Find next upcoming active event
     let event = await WebinarEvent.findOne({
       where: {
         isActive: true,
-        scheduledAt: { [Op.gte]: new Date(now.getTime() - 90 * 60 * 1000) }, // Active until 90m after start
+        scheduledAt: { [Op.gte]: new Date(now.getTime() - 90 * 60 * 1000) },
         status: { [Op.ne]: 'completed' },
       },
       order: [['scheduledAt', 'ASC']],
     });
 
     if (!event) {
-      // Calculate next Sunday 8:00 PM IST
       const target = new Date();
-      const day = target.getDay(); // 0 is Sunday
+      const day = target.getDay();
       const diff = (7 - day) % 7;
       target.setDate(target.getDate() + (diff === 0 && target.getHours() >= 20 ? 7 : diff));
       target.setHours(20, 0, 0, 0);
@@ -355,21 +353,39 @@ export const getAllRegistrations = async (req: Request, res: Response): Promise<
   }
 };
 
-// Public: Get Scarcity & Overall Stats
+// Public: Get Scarcity & Overall Stats (Dynamically calculates claimed seats and percentage based on active event)
 export const getWebinarStats = async (_req: Request, res: Response): Promise<void> => {
   try {
     const totalCount = await WebinarRegistration.count();
-    const totalSeats = 500;
-    const baseRegistered = 412;
-    const dynamicRegistered = Math.min(totalSeats - 12, baseRegistered + totalCount);
-    const seatsRemaining = Math.max(12, totalSeats - dynamicRegistered);
-    const percentFull = Math.round((dynamicRegistered / totalSeats) * 100);
+
+    const activeEvent = await WebinarEvent.findOne({
+      where: {
+        isActive: true,
+        scheduledAt: { [Op.gte]: new Date(Date.now() - 90 * 60 * 1000) },
+        status: { [Op.ne]: 'completed' },
+      },
+      order: [['scheduledAt', 'ASC']],
+    });
+
+    const totalSeats = activeEvent?.totalSeats || 500;
+    let eventRegCount = 0;
+    if (activeEvent) {
+      eventRegCount = await WebinarRegistration.count({ where: { webinarEventId: activeEvent.id } });
+    }
+
+    // Dynamic claimed calculation:
+    // Base 82% room full + real database registrations
+    const baseClaimed = Math.floor(totalSeats * 0.82);
+    const claimedSeats = Math.min(totalSeats - 6, baseClaimed + eventRegCount + (totalCount % 12));
+    const seatsRemaining = Math.max(6, totalSeats - claimedSeats);
+    const percentFull = Math.min(98, Math.max(76, Math.round((claimedSeats / totalSeats) * 100)));
 
     res.status(200).json({
       success: true,
       data: {
         totalRegistrations: totalCount,
-        dynamicRegistered,
+        claimedSeats,
+        totalSeats,
         seatsRemaining,
         percentFull,
       },
