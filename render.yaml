@@ -1,9 +1,9 @@
-services:
+﻿services:
   - type: web
     name: lms-backend
     env: node
     region: singapore
-    buildCommand: npm install --omit=dev
+    buildCommand: npm install --include=dev && npm run build
     startCommand: npm start
     envVars:
       - key: PORT
@@ -14,3 +14,4 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
+
