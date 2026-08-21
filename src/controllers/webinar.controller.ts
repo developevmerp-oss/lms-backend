@@ -1,10 +1,133 @@
 import { Request, Response } from 'express';
 import WebinarRegistration from '../models/webinarRegistration';
+import WebinarEvent from '../models/webinarEvent';
 import { Op } from 'sequelize';
 
+// Helper to format relative time
+function formatRelativeTime(date: Date): string {
+  const diffMs = Date.now() - new Date(date).getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'Just now';
+  if (diffMins === 1) return '1 minute ago';
+  if (diffMins < 60) return `${diffMins} minutes ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours === 1) return '1 hour ago';
+  if (diffHours < 24) return `${diffHours} hours ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} days ago`;
+}
+
+// Public: Get Next Upcoming Active Webinar for Live Countdown Timer & Links
+export const getNextUpcomingWebinar = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const now = new Date();
+
+    // Find next upcoming active event
+    let event = await WebinarEvent.findOne({
+      where: {
+        isActive: true,
+        scheduledAt: { [Op.gte]: new Date(now.getTime() - 90 * 60 * 1000) }, // Active until 90m after start
+        status: { [Op.ne]: 'completed' },
+      },
+      order: [['scheduledAt', 'ASC']],
+    });
+
+    if (!event) {
+      // Calculate next Sunday 8:00 PM IST
+      const target = new Date();
+      const day = target.getDay(); // 0 is Sunday
+      const diff = (7 - day) % 7;
+      target.setDate(target.getDate() + (diff === 0 && target.getHours() >= 20 ? 7 : diff));
+      target.setHours(20, 0, 0, 0);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          id: null,
+          title: 'Resin Mastery Masterclass — Live with Vrajangna Patel',
+          scheduledAt: target.toISOString(),
+          durationMinutes: 90,
+          zoomJoinUrl: 'Emailed directly upon registration',
+          whatsappGroupUrl: 'https://chat.whatsapp.com/sample-art-webinar-vip',
+          totalSeats: 500,
+          isDefault: true,
+        },
+      });
+      return;
+    }
+
+    const regCount = await WebinarRegistration.count({
+      where: { webinarEventId: event.id },
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        id: event.id,
+        title: event.title,
+        description: event.description,
+        scheduledAt: event.scheduledAt,
+        durationMinutes: event.durationMinutes,
+        zoomJoinUrl: event.zoomJoinUrl || 'Emailed directly upon registration',
+        whatsappGroupUrl: event.whatsappGroupUrl || 'https://chat.whatsapp.com/sample-art-webinar-vip',
+        prepVideoUrl: event.prepVideoUrl,
+        totalSeats: event.totalSeats,
+        registeredCount: regCount,
+        isDefault: false,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Public: Get Dynamic Recent Registrations for Social Proof Notification Pill
+export const getRecentRegistrations = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const recentRows = await WebinarRegistration.findAll({
+      order: [['createdAt', 'DESC']],
+      limit: 15,
+      attributes: ['name', 'city', 'createdAt'],
+    });
+
+    const fallbackCities = ['Ahmedabad', 'Mumbai', 'Bengaluru', 'Pune', 'Delhi NCR', 'Hyderabad', 'Jaipur', 'Surat', 'Kolkata', 'Chennai'];
+
+    const items = recentRows.map((r, idx) => {
+      const parts = (r.name || 'Student').trim().split(' ');
+      const formattedName = parts.length > 1 ? `${parts[0]} ${parts[1][0]}.` : parts[0];
+      const city = r.city || fallbackCities[idx % fallbackCities.length];
+      const time = formatRelativeTime(r.createdAt || new Date());
+
+      return {
+        name: formattedName,
+        city,
+        time,
+      };
+    });
+
+    if (items.length < 5) {
+      const defaultSeeds = [
+        { name: 'Anil P.', city: 'Ahmedabad', time: '3 minutes ago' },
+        { name: 'Priya S.', city: 'Mumbai', time: '7 minutes ago' },
+        { name: 'Sneha K.', city: 'Bengaluru', time: '11 minutes ago' },
+        { name: 'Kavita G.', city: 'Ahmedabad', time: '18 minutes ago' },
+        { name: 'Ritu M.', city: 'Pune', time: '24 minutes ago' },
+        { name: 'Deepika T.', city: 'Hyderabad', time: '31 minutes ago' },
+      ];
+      res.status(200).json({ success: true, data: [...items, ...defaultSeeds] });
+      return;
+    }
+
+    res.status(200).json({ success: true, data: items });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Public: Register Lead
 export const registerLead = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, email, phone, challenge, source } = req.body;
+    const { name, email, phone, city, challenge, source, webinarEventId } = req.body;
 
     if (!name || !email || !phone) {
       res.status(400).json({
@@ -14,11 +137,26 @@ export const registerLead = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    // Clean data
     const cleanEmail = email.trim().toLowerCase();
     const cleanPhone = phone.trim();
 
-    // Check if lead already registered
+    let targetEventId = webinarEventId;
+    let activeEvent: any = null;
+
+    if (targetEventId) {
+      activeEvent = await WebinarEvent.findByPk(targetEventId as string);
+    } else {
+      activeEvent = await WebinarEvent.findOne({
+        where: {
+          isActive: true,
+          scheduledAt: { [Op.gte]: new Date() },
+          status: { [Op.ne]: 'completed' },
+        },
+        order: [['scheduledAt', 'ASC']],
+      });
+      if (activeEvent) targetEventId = activeEvent.id;
+    }
+
     let registration = await WebinarRegistration.findOne({
       where: {
         [Op.or]: [{ email: cleanEmail }, { phone: cleanPhone }],
@@ -26,21 +164,27 @@ export const registerLead = async (req: Request, res: Response): Promise<void> =
     });
 
     if (registration) {
-      // Update with latest challenge or source
       await registration.update({
         name: name.trim(),
+        city: city || registration.city,
         challenge: challenge || registration.challenge,
         source: source || registration.source,
+        webinarEventId: targetEventId || registration.webinarEventId,
       });
     } else {
       registration = await WebinarRegistration.create({
         name: name.trim(),
         email: cleanEmail,
         phone: cleanPhone,
+        city: city || null,
         challenge: challenge || null,
         source: source || 'webinar-landing-page',
+        webinarEventId: targetEventId || null,
       });
     }
+
+    const whatsappUrl = activeEvent?.whatsappGroupUrl || 'https://chat.whatsapp.com/sample-art-webinar-vip';
+    const zoomUrl = activeEvent?.zoomJoinUrl || 'Emailed directly to your registered address';
 
     res.status(200).json({
       success: true,
@@ -50,10 +194,11 @@ export const registerLead = async (req: Request, res: Response): Promise<void> =
         name: registration.name,
         email: registration.email,
         phone: registration.phone,
-        whatsappGroupUrl: 'https://chat.whatsapp.com/sample-art-webinar-vip',
-        webinarTitle: 'Resin Mastery Masterclass — Live with Vrajangna Patel',
-        webinarDate: 'Sunday, 8:00 PM IST',
-        zoomLinkPlaceholder: 'Emailed directly to your registered address',
+        city: registration.city,
+        whatsappGroupUrl: whatsappUrl,
+        zoomLink: zoomUrl,
+        webinarTitle: activeEvent?.title || 'Resin Mastery Masterclass — Live with Vrajangna Patel',
+        scheduledAt: activeEvent?.scheduledAt || null,
       },
     });
   } catch (error: any) {
@@ -66,11 +211,106 @@ export const registerLead = async (req: Request, res: Response): Promise<void> =
   }
 };
 
+// Admin: Get All Webinar Events
+export const getAllWebinarEvents = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const events = await WebinarEvent.findAll({
+      order: [['scheduledAt', 'DESC']],
+      include: [
+        {
+          model: WebinarRegistration,
+          as: 'registrations',
+          attributes: ['id'],
+        },
+      ],
+    });
+
+    const data = events.map((e: any) => ({
+      ...e.toJSON(),
+      attendeesCount: e.registrations ? e.registrations.length : 0,
+    }));
+
+    res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Admin: Create New Webinar Event
+export const createWebinarEvent = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const {
+      title,
+      description,
+      scheduledAt,
+      durationMinutes,
+      zoomJoinUrl,
+      whatsappGroupUrl,
+      prepVideoUrl,
+      totalSeats,
+      status,
+      isActive,
+    } = req.body;
+
+    if (!scheduledAt) {
+      res.status(400).json({ success: false, message: 'Webinar scheduled date/time is required.' });
+      return;
+    }
+
+    const event = await WebinarEvent.create({
+      title: title || 'Resin Mastery Masterclass — Live with Vrajangna Patel',
+      description,
+      scheduledAt: new Date(scheduledAt),
+      durationMinutes: durationMinutes ? parseInt(durationMinutes, 10) : 90,
+      zoomJoinUrl,
+      whatsappGroupUrl,
+      prepVideoUrl,
+      totalSeats: totalSeats ? parseInt(totalSeats, 10) : 500,
+      status: status || 'upcoming',
+      isActive: isActive !== undefined ? isActive : true,
+    });
+
+    res.status(201).json({ success: true, message: 'Webinar event created successfully', data: event });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Admin: Update Webinar Event
+export const updateWebinarEvent = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = req.params.id as string;
+    const event = await WebinarEvent.findByPk(id);
+
+    if (!event) {
+      res.status(404).json({ success: false, message: 'Webinar event not found' });
+      return;
+    }
+
+    await event.update(req.body);
+    res.status(200).json({ success: true, message: 'Webinar event updated successfully', data: event });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Admin: Delete Webinar Event
+export const deleteWebinarEvent = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = req.params.id as string;
+    await WebinarEvent.destroy({ where: { id } });
+    res.status(200).json({ success: true, message: 'Webinar event removed successfully' });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Admin: Get All Registrations
 export const getAllRegistrations = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { search, page = '1', limit = '50' } = req.query;
+    const { search, webinarEventId, page = '1', limit = '100' } = req.query;
     const pageNum = parseInt(page as string, 10) || 1;
-    const limitNum = parseInt(limit as string, 10) || 50;
+    const limitNum = parseInt(limit as string, 10) || 100;
     const offset = (pageNum - 1) * limitNum;
 
     const whereClause: any = {};
@@ -79,12 +319,24 @@ export const getAllRegistrations = async (req: Request, res: Response): Promise<
         { name: { [Op.iLike]: `%${search}%` } },
         { email: { [Op.iLike]: `%${search}%` } },
         { phone: { [Op.iLike]: `%${search}%` } },
+        { city: { [Op.iLike]: `%${search}%` } },
       ];
+    }
+
+    if (webinarEventId) {
+      whereClause.webinarEventId = webinarEventId;
     }
 
     const { count, rows } = await WebinarRegistration.findAndCountAll({
       where: whereClause,
       order: [['createdAt', 'DESC']],
+      include: [
+        {
+          model: WebinarEvent,
+          as: 'webinarEvent',
+          attributes: ['id', 'title', 'scheduledAt'],
+        },
+      ],
       limit: limitNum,
       offset,
     });
@@ -99,18 +351,16 @@ export const getAllRegistrations = async (req: Request, res: Response): Promise<
       },
     });
   } catch (error: any) {
-    console.error('Fetch Registrations Error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
+// Public: Get Scarcity & Overall Stats
 export const getWebinarStats = async (_req: Request, res: Response): Promise<void> => {
   try {
     const totalCount = await WebinarRegistration.count();
-    
-    // Calculate live scarcity numbers
     const totalSeats = 500;
-    const baseRegistered = 412; // Social proof baseline
+    const baseRegistered = 412;
     const dynamicRegistered = Math.min(totalSeats - 12, baseRegistered + totalCount);
     const seatsRemaining = Math.max(12, totalSeats - dynamicRegistered);
     const percentFull = Math.round((dynamicRegistered / totalSeats) * 100);
@@ -129,9 +379,10 @@ export const getWebinarStats = async (_req: Request, res: Response): Promise<voi
   }
 };
 
+// Admin: Delete Registration Lead
 export const deleteRegistration = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     await WebinarRegistration.destroy({ where: { id } });
     res.status(200).json({ success: true, message: 'Registration removed successfully' });
   } catch (error: any) {

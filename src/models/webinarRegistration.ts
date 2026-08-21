@@ -6,8 +6,10 @@ export interface WebinarRegistrationAttributes {
   name: string;
   email: string;
   phone: string;
+  city?: string;
   challenge?: string;
   source?: string;
+  webinarEventId?: string;
   attended?: boolean;
   notes?: string;
   createdAt?: Date;
@@ -15,7 +17,7 @@ export interface WebinarRegistrationAttributes {
 }
 
 export interface WebinarRegistrationCreationAttributes
-  extends Optional<WebinarRegistrationAttributes, 'id' | 'challenge' | 'source' | 'attended' | 'notes'> {}
+  extends Optional<WebinarRegistrationAttributes, 'id' | 'city' | 'challenge' | 'source' | 'webinarEventId' | 'attended' | 'notes'> {}
 
 interface WebinarRegistration extends WebinarRegistrationAttributes {}
 class WebinarRegistration
@@ -42,6 +44,10 @@ WebinarRegistration.init(
       type: DataTypes.STRING,
       allowNull: false,
     },
+    city: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
     challenge: {
       type: DataTypes.TEXT,
       allowNull: true,
@@ -49,6 +55,10 @@ WebinarRegistration.init(
     source: {
       type: DataTypes.STRING,
       defaultValue: 'organic',
+    },
+    webinarEventId: {
+      type: DataTypes.UUID,
+      allowNull: true,
     },
     attended: {
       type: DataTypes.BOOLEAN,

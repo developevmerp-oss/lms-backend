@@ -20,6 +20,7 @@ import Notification from './notification';
 import CommunityWin from './communityWin';
 import LevelTier from './levelTier';
 import WebinarRegistration from './webinarRegistration';
+import WebinarEvent from './webinarEvent';
 
 const db: any = {};
 
@@ -46,6 +47,7 @@ db.Notification = Notification;
 db.CommunityWin = CommunityWin;
 db.LevelTier = LevelTier;
 db.WebinarRegistration = WebinarRegistration;
+db.WebinarEvent = WebinarEvent;
 
 // Setup manual associations that aren't defined in the classes
 User.hasOne(Skill, { foreignKey: 'userId', as: 'skills' });
@@ -68,6 +70,10 @@ SalesRecord.belongsTo(User, { foreignKey: 'userId' });
 
 User.hasMany(Notification, { foreignKey: 'userId', as: 'notifications' });
 Notification.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+// Webinar associations
+WebinarEvent.hasMany(WebinarRegistration, { foreignKey: 'webinarEventId', as: 'registrations' });
+WebinarRegistration.belongsTo(WebinarEvent, { foreignKey: 'webinarEventId', as: 'webinarEvent' });
 
 // Setup associations
 Object.keys(db).forEach((modelName) => {
