@@ -25,7 +25,7 @@ export const getNextUpcomingWebinar = async (_req: Request, res: Response): Prom
     let event = await WebinarEvent.findOne({
       where: {
         isActive: true,
-        scheduledAt: { [Op.gte]: new Date(now.getTime() - 90 * 60 * 1000) },
+        scheduledAt: { [Op.gt]: now },
         status: { [Op.ne]: 'completed' },
       },
       order: [['scheduledAt', 'ASC']],
@@ -129,11 +129,18 @@ export const registerLead = async (req: Request, res: Response): Promise<void> =
 
     if (targetEventId) {
       activeEvent = await WebinarEvent.findByPk(targetEventId as string);
-    } else {
+      // If event is expired in the past or inactive, discard and auto-find next upcoming future event
+      if (!activeEvent || !activeEvent.isActive || new Date(activeEvent.scheduledAt).getTime() <= Date.now()) {
+        activeEvent = null;
+        targetEventId = null;
+      }
+    }
+
+    if (!activeEvent) {
       activeEvent = await WebinarEvent.findOne({
         where: {
           isActive: true,
-          scheduledAt: { [Op.gte]: new Date() },
+          scheduledAt: { [Op.gt]: new Date() },
           status: { [Op.ne]: 'completed' },
         },
         order: [['scheduledAt', 'ASC']],
