@@ -147,14 +147,110 @@ export const commentCommunityWin = async (req: AuthRequest, res: Response): Prom
 
 export const postCommunityWin = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
-    const { achievement } = req.body;
+    const { achievement, title, salesAmount, technique, imageUrl } = req.body;
+    const studentId = req.user?.id;
     const studentName = (req.user as any)?.name || 'Student';
-    if (!achievement) return res.status(400).json({ message: 'Achievement text is required' });
-    const win = await db.CommunityWin.create({ studentName, achievement, likes: 0, timeAgo: 'Just now' });
-    return res.status(201).json(win);
+    if (!achievement && !title) return res.status(400).json({ message: 'Achievement text is required' });
+
+    let fullAchievement = achievement || title;
+    if (salesAmount) fullAchievement += ` (₹${Number(salesAmount).toLocaleString()} sale!)`;
+    if (technique) fullAchievement += ` • Technique: ${technique}`;
+
+    const win = await db.CommunityWin.create({
+      studentName,
+      achievement: fullAchievement,
+      likes: 0,
+      timeAgo: 'Just now'
+    });
+
+    let updatedPoints = 0;
+    if (studentId) {
+      const student = await User.findByPk(studentId);
+      if (student) {
+        student.points = (student.points || 0) + 50;
+        student.xpPoints = (student.xpPoints || 0) + 50;
+        await student.save();
+        updatedPoints = student.points;
+      }
+    }
+
+    return res.status(201).json({
+      success: true,
+      win,
+      awardedXp: 50,
+      newPoints: updatedPoints,
+      message: 'Win published to community wall! +50 XP awarded!'
+    });
   } catch (error) {
     console.error('Error posting community win:', error);
     res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Student: Add Sale Record for Northstar Tracking System (+100 XP)
+export const addStudentSalesRecord = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const studentId = req.user?.id;
+    const { amount, productName, date } = req.body;
+
+    if (!studentId) return res.status(401).json({ message: 'Unauthorized' });
+    if (!amount || !productName) return res.status(400).json({ message: 'Amount and Product Name are required' });
+
+    const record = await SalesRecord.create({
+      userId: studentId,
+      amount: parseFloat(amount),
+      productName,
+      date: date || new Date()
+    });
+
+    // Credit student with +100 XP for making a sale
+    const student = await User.findByPk(studentId);
+    if (student) {
+      student.points = (student.points || 0) + 100;
+      student.xpPoints = (student.xpPoints || 0) + 100;
+      await student.save();
+    }
+
+    return res.status(201).json({
+      success: true,
+      record,
+      message: 'Sales record logged successfully! +100 XP awarded!'
+    });
+  } catch (error) {
+    console.error('Error adding sales record:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Student: Delete Sale Record
+export const deleteStudentSalesRecord = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const studentId = req.user?.id;
+    const { id } = req.params;
+
+    if (!studentId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const record = await SalesRecord.findOne({ where: { id, userId: studentId } });
+    if (!record) return res.status(404).json({ message: 'Sales record not found' });
+
+    await record.destroy();
+    return res.status(200).json({ success: true, message: 'Sales record deleted' });
+  } catch (error) {
+    console.error('Error deleting sales record:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Public/Student: Get All Active & Upcoming Events from DB
+export const getPublicEventsList = async (_req: Request, res: Response): Promise<any> => {
+  try {
+    const events = await db.WebinarEvent.findAll({
+      order: [['scheduledAt', 'ASC']],
+    });
+    return res.status(200).json({ success: true, data: events });
+  } catch (error) {
+    console.error('Error fetching events list:', error);
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
