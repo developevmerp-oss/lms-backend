@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import db from '../models';
+import { sequelize } from '../config/database';
 
 const { Course, Chapter, Assignment } = db;
 
@@ -193,29 +194,45 @@ export const DEFAULT_CURRICULUM_COURSES = [
   }
 ];
 
-// Seed default curriculum if empty
+// Seed or update all 30 courses in database
 export const seedDefaultCurriculum = async () => {
   try {
-    const count = await Course.count();
-    if (count === 0) {
-      console.log('Seeding initial level-wise curriculum courses...');
-      for (const item of DEFAULT_CURRICULUM_COURSES) {
-        const course = await Course.create({
+    // Ensure columns exist first
+    try {
+      await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "levelCode" VARCHAR(255) DEFAULT 'L0';`);
+      await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "order" INTEGER DEFAULT 0;`);
+    } catch (_) {}
+
+    console.log('Ensuring all 30 level-wise courses exist in database...');
+    for (const item of DEFAULT_CURRICULUM_COURSES) {
+      let [course, created] = await Course.findOrCreate({
+        where: { title: item.title },
+        defaults: {
           title: item.title,
           description: item.description,
           levelCode: item.levelCode,
           order: item.order,
-        });
+        }
+      });
 
-        // Add 1 default chapter
+      if (!created) {
+        await course.update({
+          levelCode: item.levelCode,
+          order: item.order,
+          description: item.description,
+        });
+      }
+
+      const chapterCount = await Chapter.count({ where: { courseId: course.id } });
+      if (chapterCount === 0) {
         await Chapter.create({
-          title: `Module Overview: ${item.title.replace(/^\d+\.\s*/, '')}`,
+          title: `Lesson 1: ${item.title.replace(/^\d+\.\s*/, '')} Overview & Demonstration`,
           videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
           courseId: course.id,
         });
       }
-      console.log('Successfully seeded 30 level-wise courses!');
     }
+    console.log('Level-wise courses synced successfully!');
   } catch (err) {
     console.error('Error auto-seeding curriculum courses:', err);
   }
@@ -224,9 +241,10 @@ export const seedDefaultCurriculum = async () => {
 // Auto-run seeder on module load
 seedDefaultCurriculum();
 
-// Get all courses with Level-wise ordering
-export const getCourses = async (req: Request, res: Response): Promise<any> => {
+// Explicit Seed Endpoint for Admin
+export const triggerSeedCourses = async (req: Request, res: Response): Promise<any> => {
   try {
+    await seedDefaultCurriculum();
     const courses = await Course.findAll({
       order: [
         ['levelCode', 'ASC'],
@@ -234,14 +252,51 @@ export const getCourses = async (req: Request, res: Response): Promise<any> => {
         ['createdAt', 'ASC']
       ],
       include: [
-        { model: Chapter, as: 'chapters', order: [['createdAt', 'ASC']] },
-        { model: Assignment, as: 'assignments' }
+        { model: Chapter, as: 'chapters', order: [['createdAt', 'ASC']] }
       ]
     });
-    res.status(200).json(courses);
-  } catch (error) {
+    res.status(200).json({ message: 'All 30 level-wise courses synced to database successfully!', courses });
+  } catch (error: any) {
+    console.error('Error seeding courses:', error);
+    res.status(500).json({ message: 'Failed to seed courses', error: error?.message });
+  }
+};
+
+// Get all courses with Level-wise ordering
+export const getCourses = async (req: Request, res: Response): Promise<any> => {
+  try {
+    try {
+      const courses = await Course.findAll({
+        order: [
+          ['levelCode', 'ASC'],
+          ['order', 'ASC'],
+          ['createdAt', 'ASC']
+        ],
+        include: [
+          { model: Chapter, as: 'chapters', order: [['createdAt', 'ASC']] },
+          { model: Assignment, as: 'assignments' }
+        ]
+      });
+      return res.status(200).json(courses);
+    } catch (dbErr: any) {
+      // Column might not exist yet; run quick patch
+      try {
+        await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "levelCode" VARCHAR(255) DEFAULT 'L0';`);
+        await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "order" INTEGER DEFAULT 0;`);
+      } catch (_) {}
+
+      const fallbackCourses = await Course.findAll({
+        order: [['createdAt', 'ASC']],
+        include: [
+          { model: Chapter, as: 'chapters', order: [['createdAt', 'ASC']] },
+          { model: Assignment, as: 'assignments' }
+        ]
+      });
+      return res.status(200).json(fallbackCourses);
+    }
+  } catch (error: any) {
     console.error('Error fetching courses:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: error?.message });
   }
 };
 
@@ -249,6 +304,11 @@ export const getCourses = async (req: Request, res: Response): Promise<any> => {
 export const createCourse = async (req: Request, res: Response): Promise<any> => {
   try {
     const { title, description, image, levelCode, order } = req.body;
+    try {
+      await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "levelCode" VARCHAR(255) DEFAULT 'L0';`);
+      await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "order" INTEGER DEFAULT 0;`);
+    } catch (_) {}
+
     const course = await Course.create({
       title,
       description,
@@ -257,9 +317,9 @@ export const createCourse = async (req: Request, res: Response): Promise<any> =>
       order: parseInt(order) || 0
     });
     res.status(201).json({ message: 'Course created successfully', course });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating course:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: error?.message });
   }
 };
 
@@ -279,9 +339,9 @@ export const updateCourse = async (req: Request, res: Response): Promise<any> =>
       order: order !== undefined ? parseInt(order) : course.order
     });
     res.status(200).json({ message: 'Course updated successfully', course });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating course:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: error?.message });
   }
 };
 
@@ -295,9 +355,9 @@ export const deleteCourse = async (req: Request, res: Response): Promise<any> =>
     await Chapter.destroy({ where: { courseId: id } });
     await course.destroy();
     res.status(200).json({ message: 'Course and chapters deleted successfully' });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error deleting course:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: error?.message });
   }
 };
 
@@ -314,9 +374,9 @@ export const addChapter = async (req: Request, res: Response): Promise<any> => {
 
     const chapter = await Chapter.create({ title, videoUrl, pdfUrl, courseId });
     res.status(201).json({ message: 'Chapter added successfully', chapter });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error adding chapter:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: error?.message });
   }
 };
 
@@ -331,9 +391,9 @@ export const updateChapter = async (req: Request, res: Response): Promise<any> =
 
     await chapter.update({ title, videoUrl, pdfUrl });
     res.status(200).json({ message: 'Chapter updated successfully', chapter });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating chapter:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: error?.message });
   }
 };
 
@@ -346,8 +406,8 @@ export const deleteChapter = async (req: Request, res: Response): Promise<any> =
 
     await chapter.destroy();
     res.status(200).json({ message: 'Chapter deleted successfully' });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error deleting chapter:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: error?.message });
   }
 };

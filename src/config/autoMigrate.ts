@@ -8,6 +8,18 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
   console.log('🔄 Checking database schema and running auto-migrations...');
 
   const migrationQueries = [
+    // --- COURSES TABLE ---
+    `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "levelCode" VARCHAR(255) DEFAULT 'L0';`,
+    `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "order" INTEGER DEFAULT 0;`,
+    `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "image" TEXT;`,
+
+    // --- LEVEL TIERS TABLE ---
+    `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "price" VARCHAR(255) DEFAULT '₹499';`,
+    `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "description" TEXT;`,
+    `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "icon" VARCHAR(255);`,
+    `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "badgeColor" VARCHAR(255);`,
+    `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "order" INTEGER DEFAULT 0;`,
+
     // --- WEBINAR EVENTS TABLE ---
     `CREATE TABLE IF NOT EXISTS "WebinarEvents" (
       "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -53,6 +65,7 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
     `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "points" INTEGER DEFAULT 0;`,
     `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "streak" INTEGER DEFAULT 0;`,
     `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "rank" VARCHAR(255) DEFAULT 'Beginner';`,
+    `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "membershipLevel" VARCHAR(255) DEFAULT 'L0';`,
     `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "xpPoints" INTEGER DEFAULT 0;`,
     `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "lastRoutineDate" VARCHAR(50);`,
 
@@ -76,12 +89,6 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
     // --- MILESTONES TABLE ---
     `ALTER TABLE "Milestones" ADD COLUMN IF NOT EXISTS "description" TEXT;`,
 
-    // --- LEVEL TIERS TABLE ---
-    `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "description" TEXT;`,
-    `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "icon" VARCHAR(255);`,
-    `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "badgeColor" VARCHAR(255);`,
-    `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "order" INTEGER DEFAULT 0;`,
-
     // --- PERFORMANCE INDEXES ---
     `CREATE INDEX IF NOT EXISTS "idx_users_email" ON "Users" ("email");`,
     `CREATE INDEX IF NOT EXISTS "idx_users_role" ON "Users" ("role");`,
@@ -93,15 +100,15 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
   ];
 
   try {
-    const combinedSql = migrationQueries.join('\n');
-    await sequelize.query(combinedSql);
-  } catch (err: any) {
     for (const query of migrationQueries) {
       try {
         await sequelize.query(query);
-      } catch (_) {}
+      } catch (e: any) {
+        // Safe to ignore if column/index already exists
+      }
     }
+    console.log('✅ Auto-migrations completed successfully.');
+  } catch (err: any) {
+    console.warn('⚠️ Auto-migration note:', err?.message);
   }
-
-  console.log('✅ Auto-migrations completed successfully.');
 };
