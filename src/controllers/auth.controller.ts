@@ -85,13 +85,17 @@ export const login = async (req: Request, res: Response): Promise<any> => {
     // Find user
     const user = await User.findOne({ where: { email: cleanEmail } });
     if (!user) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+      return res.status(400).json({ message: 'Invalid email or password' });
+    }
+
+    if (!user.password) {
+      return res.status(400).json({ message: 'Account does not have password login enabled. Please register.' });
     }
 
     // Check password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+      return res.status(400).json({ message: 'Invalid email or password' });
     }
 
     // Generate token
@@ -101,7 +105,7 @@ export const login = async (req: Request, res: Response): Promise<any> => {
       { expiresIn: '30d' }
     );
 
-    res.status(200).json({
+    return res.status(200).json({
       message: 'Login successful',
       token,
       user: {
@@ -111,12 +115,14 @@ export const login = async (req: Request, res: Response): Promise<any> => {
         role: user.role,
         avatarUrl: user.avatarUrl,
         rank: user.rank,
-        points: user.points,
+        membershipLevel: user.membershipLevel || 'L0',
+        points: user.points || 0,
+        xpPoints: user.xpPoints || 0,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Login error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ message: error?.message || 'Internal server error' });
   }
 };
 

@@ -56,7 +56,7 @@ class User extends Model<UserAttributes, UserCreationAttributes> implements User
       allowNull: false,
     },
     role: {
-      type: DataTypes.ENUM('admin', 'student'),
+      type: DataTypes.STRING,
       defaultValue: 'student',
       allowNull: false,
     },
@@ -69,7 +69,7 @@ class User extends Model<UserAttributes, UserCreationAttributes> implements User
       defaultValue: 0,
     },
     membershipLevel: {
-      type: DataTypes.ENUM('L0', 'L1', 'L2', 'L3'),
+      type: DataTypes.STRING,
       defaultValue: 'L0',
     },
     rank: {
