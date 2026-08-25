@@ -6,24 +6,26 @@ export interface CourseAttributes {
   title: string;
   description: string;
   image?: string;
+  levelCode?: string; // 'L0' | 'L1' | 'L2' | 'L3' | 'L3+'
+  order?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 export interface CourseCreationAttributes extends Optional<CourseAttributes, 'id'> {}
 
-
 interface Course extends CourseAttributes {
   id: string;
   title: string;
   description: string;
   image: string;
+  levelCode: string;
+  order: number;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
 
-class Course extends Model<CourseAttributes, CourseCreationAttributes> implements CourseAttributes {
-}
+class Course extends Model<CourseAttributes, CourseCreationAttributes> implements CourseAttributes {}
 
 Course.init(
   {
@@ -44,6 +46,16 @@ Course.init(
     image: {
       type: DataTypes.STRING,
       allowNull: true,
+    },
+    levelCode: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'L0',
+    },
+    order: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
     },
   },
   {
