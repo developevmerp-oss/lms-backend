@@ -150,14 +150,80 @@ const DEFAULT_BADGES = [
 
 export const getAllBadges = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
-    let badges = await Badge.findAll();
+    let badges = await Badge.findAll({
+      order: [['pointsRequired', 'ASC'], ['name', 'ASC']]
+    });
     if (!badges || badges.length === 0) {
       await Badge.bulkCreate(DEFAULT_BADGES);
-      badges = await Badge.findAll();
+      badges = await Badge.findAll({
+        order: [['pointsRequired', 'ASC'], ['name', 'ASC']]
+      });
     }
     return res.status(200).json(badges);
   } catch (error) {
     console.error('Error fetching badges:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// CREATE a new badge
+export const createBadge = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { name, icon, color, description, pointsRequired } = req.body;
+    if (!name) return res.status(400).json({ message: 'Badge name is required' });
+
+    const badge = await Badge.create({
+      name: name.trim(),
+      icon: icon || '🎨',
+      color: color || 'orange',
+      description: description || '',
+      pointsRequired: parseInt(pointsRequired) || 0,
+    });
+
+    return res.status(201).json(badge);
+  } catch (error) {
+    console.error('Error creating badge:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// UPDATE an existing badge
+export const updateBadge = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { badgeId } = req.params;
+    const { name, icon, color, description, pointsRequired } = req.body;
+
+    const badge = await Badge.findByPk(badgeId);
+    if (!badge) return res.status(404).json({ message: 'Badge not found' });
+
+    await badge.update({
+      name: name !== undefined ? name.trim() : badge.name,
+      icon: icon !== undefined ? icon : badge.icon,
+      color: color !== undefined ? color : badge.color,
+      description: description !== undefined ? description : badge.description,
+      pointsRequired: pointsRequired !== undefined ? parseInt(pointsRequired) : badge.pointsRequired,
+    });
+
+    return res.status(200).json(badge);
+  } catch (error) {
+    console.error('Error updating badge:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// DELETE a badge
+export const deleteBadge = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { badgeId } = req.params;
+    const badge = await Badge.findByPk(badgeId);
+    if (!badge) return res.status(404).json({ message: 'Badge not found' });
+
+    await UserBadge.destroy({ where: { badgeId } });
+    await badge.destroy();
+
+    return res.status(200).json({ message: 'Badge deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting badge:', error);
     return res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -167,6 +233,15 @@ export const awardBadge = async (req: AuthRequest, res: Response): Promise<any> 
   try {
     const { studentId } = req.params;
     const { badgeId } = req.body;
+
+    if (studentId === 'all') {
+      const students = await User.findAll({ where: { role: 'student' } });
+      for (const st of students) {
+        await UserBadge.findOrCreate({ where: { userId: st.id, badgeId } });
+      }
+      return res.status(200).json({ message: 'Badge awarded to all students successfully' });
+    }
+
     const existing = await UserBadge.findOne({ where: { userId: studentId, badgeId } });
     if (existing) return res.status(409).json({ message: 'Badge already awarded to this student' });
     await UserBadge.create({ userId: studentId, badgeId });

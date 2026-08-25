@@ -10,6 +10,9 @@ import {
   addSalesRecord,
   deleteSalesRecord,
   getAllBadges,
+  createBadge,
+  updateBadge,
+  deleteBadge,
   awardBadge,
   removeBadgeFromStudent,
   updateStudentSkills,
@@ -46,6 +49,9 @@ router.delete('/sales/:recordId', deleteSalesRecord);
 
 // Badges
 router.get('/badges', getAllBadges);
+router.post('/badges', createBadge);
+router.put('/badges/:badgeId', updateBadge);
+router.delete('/badges/:badgeId', deleteBadge);
 router.post('/students/:studentId/badges', awardBadge);
 router.delete('/students/:studentId/badges/:badgeId', removeBadgeFromStudent);
 
