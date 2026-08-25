@@ -11,6 +11,7 @@ import portfolioRoutes from './portfolio.routes';
 import adminRoutes from './admin.routes';
 import webinarRoutes from './webinar.routes';
 import paymentRoutes from './payment.routes';
+import classRoutes from './class.routes';
 
 const router = Router();
 
@@ -26,5 +27,6 @@ router.use('/portfolios', portfolioRoutes);
 router.use('/admin', adminRoutes);
 router.use('/webinar', webinarRoutes);
 router.use('/payments', paymentRoutes);
+router.use('/classes', classRoutes);
 
 export default router;

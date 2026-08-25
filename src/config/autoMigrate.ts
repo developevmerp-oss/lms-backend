@@ -8,6 +8,37 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
   console.log('🔄 Checking database schema and running auto-migrations...');
 
   const migrationQueries = [
+    // --- LIVE CLASSES & ATTENDANCE TABLES ---
+    `CREATE TABLE IF NOT EXISTS "LiveClasses" (
+      "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "title" VARCHAR(255) NOT NULL DEFAULT 'Weekly Resin Masterclass & Live Q&A',
+      "description" TEXT,
+      "scheduledAt" TIMESTAMP WITH TIME ZONE NOT NULL,
+      "durationMinutes" INTEGER DEFAULT 60,
+      "meetingUrl" VARCHAR(255),
+      "recordingUrl" VARCHAR(255),
+      "targetLevel" VARCHAR(50) DEFAULT 'All',
+      "status" VARCHAR(50) DEFAULT 'upcoming',
+      "instructor" VARCHAR(255) DEFAULT 'Vrajangna Patel',
+      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );`,
+
+    `CREATE TABLE IF NOT EXISTS "ClassAttendances" (
+      "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "classId" UUID NOT NULL,
+      "userId" UUID NOT NULL,
+      "joinedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      "attended" BOOLEAN DEFAULT true,
+      "notes" VARCHAR(255),
+      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );`,
+
+    `CREATE INDEX IF NOT EXISTS "idx_attendance_class" ON "ClassAttendances" ("classId");`,
+    `CREATE INDEX IF NOT EXISTS "idx_attendance_user" ON "ClassAttendances" ("userId");`,
+    `CREATE INDEX IF NOT EXISTS "idx_liveclass_scheduled" ON "LiveClasses" ("scheduledAt");`,
+
     // --- COURSES TABLE ---
     `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "levelCode" VARCHAR(255) DEFAULT 'L0';`,
     `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "order" INTEGER DEFAULT 0;`,
