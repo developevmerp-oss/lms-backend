@@ -21,8 +21,8 @@ router.get('/recent-registrations', getRecentRegistrations);
 router.get('/stats', getWebinarStats);
 router.post('/register', registerLead);
 
-// Admin Multi-Webinar Management Routes
-router.get('/events', authenticate, requireAdmin, getAllWebinarEvents);
+// Webinar Multi-Event Routes (Accessible to authenticated students & admins)
+router.get('/events', authenticate, getAllWebinarEvents);
 router.post('/events', authenticate, requireAdmin, createWebinarEvent);
 router.put('/events/:id', authenticate, requireAdmin, updateWebinarEvent);
 router.delete('/events/:id', authenticate, requireAdmin, deleteWebinarEvent);
