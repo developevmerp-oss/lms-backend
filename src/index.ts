@@ -49,6 +49,10 @@ const startServer = async () => {
     await sequelize.authenticate();
     console.log('✅ Database connected');
 
+    // Auto-create any missing tables in the database
+    await sequelize.sync();
+    console.log('✅ Database models synchronized');
+
     // Run safe auto-migrations for missing columns and large data types
     await runAutoMigrations(sequelize);
     console.log('✅ Ready to serve requests');

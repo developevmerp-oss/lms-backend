@@ -138,6 +138,22 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
         // Safe to ignore if column/index already exists
       }
     }
+
+    // Seed default admin if none exists
+    try {
+      const [adminExists]: any = await sequelize.query(`SELECT id FROM "Users" WHERE role = 'admin' LIMIT 1;`);
+      if (!adminExists || adminExists.length === 0) {
+        const bcrypt = require('bcrypt');
+        const hash = await bcrypt.hash('admin123', 10);
+        await sequelize.query(`
+          INSERT INTO "Users" ("id", "name", "email", "password", "role", "membershipLevel", "rank", "points", "streak", "createdAt", "updatedAt")
+          VALUES (gen_random_uuid(), 'Admin', 'admin@ravishingarthub.com', '${hash}', 'admin', 'L3', 'Founder', 10000, 1, NOW(), NOW())
+          ON CONFLICT ("email") DO NOTHING;
+        `);
+        console.log('👑 Default admin account seeded: admin@ravishingarthub.com (password: admin123)');
+      }
+    } catch (_) {}
+
     console.log('✅ Auto-migrations completed successfully.');
   } catch (err: any) {
     console.warn('⚠️ Auto-migration note:', err?.message);

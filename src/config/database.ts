@@ -3,20 +3,28 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const dbUrl = process.env.DATABASE_URL || 'postgres://root:rootpassword@localhost:5432/art_lms_db';
+// User's active Neon.tech PostgreSQL connection with pooled connection string
+const dbUrl =
+  process.env.DATABASE_URL ||
+  'postgresql://neondb_owner:npg_hG6P0nVriydo@ep-weathered-fire-ay8swz32-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require';
 
-const isProduction = process.env.NODE_ENV === 'production' || process.env.DB_SSL === 'true' || (process.env.DATABASE_URL && process.env.DATABASE_URL.includes('neon.tech'));
+const isNeonOrSsl =
+  process.env.NODE_ENV === 'production' ||
+  process.env.DB_SSL === 'true' ||
+  dbUrl.includes('neon.tech') ||
+  dbUrl.includes('sslmode=require');
 
 export const sequelize = new Sequelize(dbUrl, {
   dialect: 'postgres',
   logging: false, // Set to console.log to see SQL queries
-  ...(isProduction ? {
-    dialectOptions: {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false
+  ...(isNeonOrSsl
+    ? {
+        dialectOptions: {
+          ssl: {
+            require: true,
+            rejectUnauthorized: false,
+          },
+        },
       }
-    }
-  } : {})
+    : {}),
 });
-
