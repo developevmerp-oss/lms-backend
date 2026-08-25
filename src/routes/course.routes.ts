@@ -6,7 +6,8 @@ import {
   deleteCourse,
   addChapter,
   updateChapter,
-  deleteChapter
+  deleteChapter,
+  triggerSeedCourses
 } from '../controllers/course.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 
@@ -16,6 +17,7 @@ const router = Router();
 router.get('/', authenticate, getCourses);
 
 // Admin course management
+router.post('/seed', authenticate, authorize(['admin']), triggerSeedCourses);
 router.post('/', authenticate, authorize(['admin']), createCourse);
 router.put('/:id', authenticate, authorize(['admin']), updateCourse);
 router.delete('/:id', authenticate, authorize(['admin']), deleteCourse);
