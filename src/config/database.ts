@@ -6,7 +6,7 @@ dotenv.config();
 // User's active Neon.tech PostgreSQL connection with pooled connection string
 const dbUrl =
   process.env.DATABASE_URL ||
-  'postgresql://neondb_owner:npg_hG6P0nVriydo@ep-weathered-fire-ay8swz32-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require';
+  'postgresql://neondb_owner:npg_JOwIH8s5gTuq@ep-divine-water-ay53xryl-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require';
 
 const isNeonOrSsl =
   process.env.NODE_ENV === 'production' ||
