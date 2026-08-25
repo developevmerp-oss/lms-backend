@@ -329,25 +329,25 @@ export const deleteCommunityWin = async (req: AuthRequest, res: Response): Promi
 // ===== LEVEL & TIER SETTINGS MANAGEMENT =====
 
 const DEFAULT_LEVELS = [
-  { code: 'L0', name: 'Fast Track: Resin FastStart Bundle', minPoints: 0, maxPoints: 499, icon: '⚡', badgeColor: 'emerald', order: 0, description: 'Foundations, chemistry, and first creations' },
-  { code: 'L1', name: 'Silver Membership: Explore Membership', minPoints: 500, maxPoints: 4999, icon: '🥈', badgeColor: 'slate', order: 1, description: 'Core techniques, first client sale, and portfolio building' },
-  { code: 'L2', name: 'Gold Membership: Master Membership', minPoints: 5000, maxPoints: 9999, icon: '🏆', badgeColor: 'amber', order: 2, description: 'High-ticket geode clocks, bridal preservation, and consistent revenue' },
-  { code: 'L3', name: 'Diamond Membership: Renaissance Certification', minPoints: 10000, maxPoints: 49999, icon: '💎', badgeColor: 'cyan', order: 3, description: 'Scale beyond ₹50K/month, furniture river tables, and corporate orders' },
-  { code: 'L3+', name: 'Masters Club: Artistry Pinnacle', minPoints: 50000, maxPoints: null, icon: '👑', badgeColor: 'purple', order: 4, description: 'Offline city workshops, mentorship, and signature brand empire' },
+  { code: 'L0', name: 'Fast Track', price: '₹499', minPoints: 0, maxPoints: 499, icon: '⚡', badgeColor: 'emerald', order: 0, description: 'Resin fundamentals, safety protocols, and foundational finishing techniques.' },
+  { code: 'L1', name: 'Silver Member', price: '₹4,999', minPoints: 500, maxPoints: 4999, icon: '🥈', badgeColor: 'slate', order: 1, description: 'Coasters, fridge magnets, marbling, lotus pond, and beach theme creations.' },
+  { code: 'L2', name: 'Gold Member', price: '₹19,999', minPoints: 5000, maxPoints: 9999, icon: '🏆', badgeColor: 'amber', order: 2, description: 'Geode art, vein effect, Tree of Life clocks, and 3D wave masterclasses.' },
+  { code: 'L3', name: 'Diamond Club', price: '₹59,999', minPoints: 10000, maxPoints: 49999, icon: '💎', badgeColor: 'cyan', order: 3, description: 'River wood tables, bridal varmala preservation, 3D photo art, concrete candles, and business scaling.' },
+  { code: 'L3+', name: 'Masters Club', price: 'Exclusive', minPoints: 50000, maxPoints: null, icon: '👑', badgeColor: 'purple', order: 4, description: 'City workshops, franchise license, bespoke mentorship, and signature brand.' },
 ];
 
 // GET all configured level tiers (with auto-seeding if empty)
 export const getAllLevelTiers = async (req: Request, res: Response): Promise<any> => {
   try {
     let levels = await LevelTier.findAll({
-      order: [['minPoints', 'ASC'], ['order', 'ASC']]
+      order: [['order', 'ASC'], ['minPoints', 'ASC']]
     });
 
     if (!levels || levels.length === 0) {
       // Auto-seed default levels
       await LevelTier.bulkCreate(DEFAULT_LEVELS);
       levels = await LevelTier.findAll({
-        order: [['minPoints', 'ASC'], ['order', 'ASC']]
+        order: [['order', 'ASC'], ['minPoints', 'ASC']]
       });
     }
 
@@ -361,16 +361,17 @@ export const getAllLevelTiers = async (req: Request, res: Response): Promise<any
 // CREATE a new level tier
 export const createLevelTier = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
-    const { code, name, minPoints, maxPoints, icon, badgeColor, order, description } = req.body;
+    const { code, name, price, minPoints, maxPoints, icon, badgeColor, order, description } = req.body;
 
-    if (!code || !name || minPoints === undefined) {
-      return res.status(400).json({ message: 'Code, name, and minPoints are required' });
+    if (!code || !name) {
+      return res.status(400).json({ message: 'Code and name are required' });
     }
 
     const tier = await LevelTier.create({
       code,
       name,
-      minPoints: Number(minPoints),
+      price: price || '₹499',
+      minPoints: Number(minPoints) || 0,
       maxPoints: maxPoints !== undefined && maxPoints !== null && maxPoints !== '' ? Number(maxPoints) : null,
       icon: icon || '⚡',
       badgeColor: badgeColor || 'emerald',
@@ -389,7 +390,7 @@ export const createLevelTier = async (req: AuthRequest, res: Response): Promise<
 export const updateLevelTier = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const { levelId } = req.params;
-    const { code, name, minPoints, maxPoints, icon, badgeColor, order, description } = req.body;
+    const { code, name, price, minPoints, maxPoints, icon, badgeColor, order, description } = req.body;
 
     const tier = await LevelTier.findByPk(levelId);
     if (!tier) return res.status(404).json({ message: 'Level tier not found' });
@@ -397,6 +398,7 @@ export const updateLevelTier = async (req: AuthRequest, res: Response): Promise<
     await tier.update({
       code: code !== undefined ? code : tier.code,
       name: name !== undefined ? name : tier.name,
+      price: price !== undefined ? price : tier.price,
       minPoints: minPoints !== undefined ? Number(minPoints) : tier.minPoints,
       maxPoints: maxPoints !== undefined ? (maxPoints !== null && maxPoints !== '' ? Number(maxPoints) : null) : tier.maxPoints,
       icon: icon !== undefined ? icon : tier.icon,
