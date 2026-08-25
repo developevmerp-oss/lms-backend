@@ -1,5 +1,13 @@
 import { Router } from 'express';
-import { getCourses, createCourse, addChapter } from '../controllers/course.controller';
+import {
+  getCourses,
+  createCourse,
+  updateCourse,
+  deleteCourse,
+  addChapter,
+  updateChapter,
+  deleteChapter
+} from '../controllers/course.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -7,8 +15,14 @@ const router = Router();
 // Everyone (authenticated) can get courses
 router.get('/', authenticate, getCourses);
 
-// Only admins can create courses and add chapters
+// Admin course management
 router.post('/', authenticate, authorize(['admin']), createCourse);
+router.put('/:id', authenticate, authorize(['admin']), updateCourse);
+router.delete('/:id', authenticate, authorize(['admin']), deleteCourse);
+
+// Admin chapter management
 router.post('/:courseId/chapters', authenticate, authorize(['admin']), addChapter);
+router.put('/chapters/:chapterId', authenticate, authorize(['admin']), updateChapter);
+router.delete('/chapters/:chapterId', authenticate, authorize(['admin']), deleteChapter);
 
 export default router;
