@@ -37,6 +37,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api', routes);
 
 import { runAutoMigrations } from './config/autoMigrate';
+import { seedDefaultCurriculum } from './controllers/course.controller';
 
 const startServer = async () => {
   // Start HTTP listener immediately so server is instantly ready
@@ -55,6 +56,10 @@ const startServer = async () => {
 
     // Run safe auto-migrations for missing columns and large data types
     await runAutoMigrations(sequelize);
+
+    // Seed 30 curriculum courses now that tables are synchronized
+    await seedDefaultCurriculum();
+
     console.log('✅ Ready to serve requests');
   } catch (error) {
     console.error('Unable to connect to the database:', error);

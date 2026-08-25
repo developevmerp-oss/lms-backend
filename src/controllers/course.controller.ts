@@ -238,9 +238,6 @@ export const seedDefaultCurriculum = async () => {
   }
 };
 
-// Auto-run seeder on module load
-seedDefaultCurriculum();
-
 // Explicit Seed Endpoint for Admin
 export const triggerSeedCourses = async (req: Request, res: Response): Promise<any> => {
   try {
