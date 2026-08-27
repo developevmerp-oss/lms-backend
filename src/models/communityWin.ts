@@ -5,19 +5,21 @@ export interface CommunityWinAttributes {
   id: string;
   studentName: string;
   achievement: string;
+  image?: string | null;
   likes: number;
   comments?: Array<{ author: string; text: string }>;
-  timeAgo: string; // e.g., '2h ago' (could be computed from createdAt, but storing string is easier for UI initially)
+  timeAgo: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-export interface CommunityWinCreationAttributes extends Optional<CommunityWinAttributes, 'id' | 'likes' | 'comments'> {}
+export interface CommunityWinCreationAttributes extends Optional<CommunityWinAttributes, 'id' | 'likes' | 'comments' | 'image'> {}
 
 class CommunityWin extends Model<CommunityWinAttributes, CommunityWinCreationAttributes> implements CommunityWinAttributes {
   public id!: string;
   public studentName!: string;
   public achievement!: string;
+  public image!: string | null;
   public likes!: number;
   public comments!: Array<{ author: string; text: string }>;
   public timeAgo!: string;
@@ -38,8 +40,12 @@ CommunityWin.init(
       allowNull: false,
     },
     achievement: {
-      type: DataTypes.STRING,
+      type: DataTypes.TEXT,
       allowNull: false,
+    },
+    image: {
+      type: DataTypes.TEXT,
+      allowNull: true,
     },
     likes: {
       type: DataTypes.INTEGER,
