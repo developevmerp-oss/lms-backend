@@ -326,3 +326,29 @@ export const completeDailyRoutine = async (req: AuthRequest, res: Response): Pro
     return res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+// GET all community wins (Student / Authenticated users)
+export const getCommunityWins = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const wins = await db.CommunityWin.findAll({
+      order: [['createdAt', 'DESC']]
+    });
+    return res.status(200).json(wins);
+  } catch (error) {
+    console.error('Error fetching community wins:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// GET all public badges (Student / Authenticated users)
+export const getPublicBadges = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const badges = await db.Badge.findAll({
+      order: [['pointsRequired', 'ASC']]
+    });
+    return res.status(200).json(badges);
+  } catch (error) {
+    console.error('Error fetching public badges:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};

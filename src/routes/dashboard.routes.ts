@@ -5,6 +5,8 @@ import {
   likeCommunityWin,
   commentCommunityWin,
   postCommunityWin,
+  getCommunityWins,
+  getPublicBadges,
   getPublicLevelTiers,
   completeDailyRoutine,
   addStudentSalesRecord,
@@ -21,6 +23,9 @@ router.get('/levels', getPublicLevelTiers);
 // Public / Student events list route
 router.get('/events', getPublicEventsList);
 
+// Public / Student badges route
+router.get('/badges', authenticate, getPublicBadges);
+
 // Admin stats route
 router.get('/admin', authenticate, authorize(['admin']), getAdminStats);
 
@@ -34,7 +39,8 @@ router.delete('/student/sales/:id', authenticate, deleteStudentSalesRecord);
 // 6-Habit Daily Routine Completion route
 router.post('/student/routine', authenticate, completeDailyRoutine);
 
-// Community Win interactions
+// Community Win routes (Student / Authenticated users)
+router.get('/community-wins', authenticate, getCommunityWins);
 router.post('/community-wins', authenticate, postCommunityWin);
 router.post('/community-wins/:id/like', authenticate, likeCommunityWin);
 router.post('/community-wins/:id/comment', authenticate, commentCommunityWin);
