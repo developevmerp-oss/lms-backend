@@ -79,6 +79,16 @@ export const getStudentStats = async (req: AuthRequest, res: Response): Promise<
     const nextMilestone = student.milestones?.find((m: any) => !m.completed);
     const nextGoal = nextMilestone ? `Next Milestone: ${nextMilestone.name}` : 'Complete pending missions';
 
+    // Validity & Expiration check for student
+    const now = new Date();
+    const membershipExpiresAt = student.membershipExpiresAt ? new Date(student.membershipExpiresAt) : null;
+    const isExpired = Boolean(membershipExpiresAt && now > membershipExpiresAt);
+    let daysRemaining: number | null = null;
+    if (membershipExpiresAt) {
+      const diffTime = membershipExpiresAt.getTime() - now.getTime();
+      daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    }
+
     res.status(200).json({
       points: student.points,
       xpPoints: student.xpPoints,
@@ -87,6 +97,9 @@ export const getStudentStats = async (req: AuthRequest, res: Response): Promise<
       currentTier,
       levelTiers,
       rank: student.rank,
+      membershipExpiresAt,
+      isExpired,
+      daysRemaining,
       skills: student.skills,
       badges: student.badges,
       portfolios: student.portfolios,

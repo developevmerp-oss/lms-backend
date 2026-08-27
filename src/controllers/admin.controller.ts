@@ -54,10 +54,19 @@ export const getStudentById = async (req: AuthRequest, res: Response): Promise<a
 export const updateStudent = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const { studentId } = req.params;
-    const { name, points, xpPoints, streak, membershipLevel, rank, city } = req.body;
+    const { name, points, xpPoints, streak, membershipLevel, rank, city, membershipExpiresAt } = req.body;
     const student = await User.findByPk(studentId);
     if (!student) return res.status(404).json({ message: 'Student not found' });
-    await student.update({ name, points, xpPoints, streak, membershipLevel, rank, city });
+    await student.update({
+      name: name !== undefined ? name : student.name,
+      points: points !== undefined ? points : student.points,
+      xpPoints: xpPoints !== undefined ? xpPoints : student.xpPoints,
+      streak: streak !== undefined ? streak : student.streak,
+      membershipLevel: membershipLevel !== undefined ? membershipLevel : student.membershipLevel,
+      rank: rank !== undefined ? rank : student.rank,
+      city: city !== undefined ? city : student.city,
+      membershipExpiresAt: membershipExpiresAt !== undefined ? (membershipExpiresAt ? new Date(membershipExpiresAt) : null) : student.membershipExpiresAt,
+    });
     return res.status(200).json(student);
   } catch (error) {
     console.error('Error updating student:', error);

@@ -4,7 +4,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import db from '../models';
 
-const { User, SalesRecord, Notification, CommunityWin } = db;
+const { User, SalesRecord, Notification, CommunityWin, LevelTier } = db;
 
 let dynamicRazorpayKeyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_1DP5mmOlF5G5ag';
 let dynamicRazorpayKeySecret = process.env.RAZORPAY_KEY_SECRET || '';
@@ -134,17 +134,27 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
     const fullTierLabel = `${tierName} (${tierCode})`;
     const targetEmail = (email || '').trim().toLowerCase();
 
+    // Fetch Level Tier configuration to check validity (Single Validity vs Lifetime)
+    let membershipExpiresAt: Date | null = null;
+    try {
+      const matchedTier = await LevelTier.findOne({ where: { code: tierCode.trim().toUpperCase() } });
+      if (matchedTier && matchedTier.validityDays && Number(matchedTier.validityDays) > 0) {
+        membershipExpiresAt = new Date(Date.now() + Number(matchedTier.validityDays) * 24 * 60 * 60 * 1000);
+      }
+    } catch (_) {}
+
     let user: any = null;
 
     if (targetEmail) {
       user = await User.findOne({ where: { email: targetEmail } });
 
       if (user) {
-        // Update existing user level
+        // Update existing user level & validity
         await user.update({
           membershipLevel: fullTierLabel,
           rank: fullTierLabel,
           role: 'student',
+          membershipExpiresAt,
         });
       } else {
         // Create new student account directly (e.g. from Thank You page purchase)
@@ -159,6 +169,7 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
           role: 'student',
           membershipLevel: fullTierLabel,
           rank: fullTierLabel,
+          membershipExpiresAt,
           points: 100,
           streak: 1,
         });
