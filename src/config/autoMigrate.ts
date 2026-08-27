@@ -78,6 +78,22 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
     `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "category" VARCHAR(100) DEFAULT 'General';`,
     `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "validityDays" INTEGER DEFAULT 0;`,
     `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "isPublished" BOOLEAN DEFAULT true;`,
+    `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "offerTitle" VARCHAR(255) DEFAULT 'Special Festival Offer';`,
+
+    // --- LEVEL OFFERS TABLE (SEPARATE MODULE) ---
+    `CREATE TABLE IF NOT EXISTS "LevelOffers" (
+      "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "title" VARCHAR(255) NOT NULL,
+      "levelCode" VARCHAR(50) NOT NULL DEFAULT 'L1',
+      "discountType" VARCHAR(50) NOT NULL DEFAULT 'percentage',
+      "discountValue" FLOAT NOT NULL DEFAULT 0,
+      "startDate" TIMESTAMP WITH TIME ZONE,
+      "endDate" TIMESTAMP WITH TIME ZONE,
+      "isActive" BOOLEAN DEFAULT true,
+      "bannerText" VARCHAR(255),
+      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );`,
 
     // --- WEBINAR EVENTS TABLE ---
     `CREATE TABLE IF NOT EXISTS "WebinarEvents" (

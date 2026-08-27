@@ -463,6 +463,7 @@ export const createLevelTier = async (req: AuthRequest, res: Response): Promise<
       offerStartDate,
       offerEndDate,
       offerActive,
+      offerTitle,
     } = req.body;
 
     if (!code || !name) {
@@ -487,6 +488,7 @@ export const createLevelTier = async (req: AuthRequest, res: Response): Promise<
       offerStartDate: offerStartDate ? new Date(offerStartDate) : null,
       offerEndDate: offerEndDate ? new Date(offerEndDate) : null,
       offerActive: Boolean(offerActive),
+      offerTitle: offerTitle || 'Special Level Offer',
     });
 
     return res.status(201).json(tier);
@@ -518,6 +520,7 @@ export const updateLevelTier = async (req: AuthRequest, res: Response): Promise<
       offerStartDate,
       offerEndDate,
       offerActive,
+      offerTitle,
     } = req.body;
 
     const tier = await LevelTier.findByPk(levelId);
@@ -541,6 +544,7 @@ export const updateLevelTier = async (req: AuthRequest, res: Response): Promise<
       offerStartDate: offerStartDate !== undefined ? (offerStartDate ? new Date(offerStartDate) : null) : tier.offerStartDate,
       offerEndDate: offerEndDate !== undefined ? (offerEndDate ? new Date(offerEndDate) : null) : tier.offerEndDate,
       offerActive: offerActive !== undefined ? Boolean(offerActive) : tier.offerActive,
+      offerTitle: offerTitle !== undefined ? offerTitle : tier.offerTitle,
     });
 
     return res.status(200).json(tier);

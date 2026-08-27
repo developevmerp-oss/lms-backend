@@ -30,11 +30,29 @@ import {
   deleteLevelTier,
   getRevenueByTier,
 } from '../controllers/admin.controller';
+import {
+  getAllOffers,
+  createOffer,
+  updateOffer,
+  toggleOffer,
+  deleteOffer,
+  getActiveOffers,
+} from '../controllers/offer.controller';
 
 const router = Router();
 
+// Public active offers endpoint
+router.get('/offers/active', getActiveOffers);
+
 // All admin routes require auth + admin role
 router.use(authenticate, requireAdmin);
+
+// Offers Module (Separate Module)
+router.get('/offers', getAllOffers);
+router.post('/offers', createOffer);
+router.put('/offers/:id', updateOffer);
+router.patch('/offers/:id/toggle', toggleOffer);
+router.delete('/offers/:id', deleteOffer);
 
 // Students
 router.get('/students', getAllStudents);

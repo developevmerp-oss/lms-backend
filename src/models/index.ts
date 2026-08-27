@@ -23,6 +23,7 @@ import WebinarRegistration from './webinarRegistration';
 import WebinarEvent from './webinarEvent';
 import LiveClass from './liveClass';
 import ClassAttendance from './classAttendance';
+import LevelOffer from './levelOffer';
 
 const db: any = {};
 
@@ -52,6 +53,7 @@ db.WebinarRegistration = WebinarRegistration;
 db.WebinarEvent = WebinarEvent;
 db.LiveClass = LiveClass;
 db.ClassAttendance = ClassAttendance;
+db.LevelOffer = LevelOffer;
 
 // Setup manual associations
 User.hasOne(Skill, { foreignKey: 'userId', as: 'skills' });

@@ -20,6 +20,7 @@ export interface LevelTierAttributes {
   offerStartDate?: Date | string | null;
   offerEndDate?: Date | string | null;
   offerActive?: boolean;
+  offerTitle?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -45,6 +46,7 @@ class LevelTier extends Model<LevelTierAttributes, LevelTierCreationAttributes> 
   public offerStartDate?: Date | null;
   public offerEndDate?: Date | null;
   public offerActive?: boolean;
+  public offerTitle?: string | null;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -134,6 +136,11 @@ LevelTier.init(
       type: DataTypes.BOOLEAN,
       allowNull: true,
       defaultValue: false,
+    },
+    offerTitle: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      defaultValue: 'Special Festival Offer',
     },
   },
   {
