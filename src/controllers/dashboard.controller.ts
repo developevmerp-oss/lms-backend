@@ -147,7 +147,7 @@ export const commentCommunityWin = async (req: AuthRequest, res: Response): Prom
 
 export const postCommunityWin = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
-    const { achievement, title, salesAmount, technique, imageUrl } = req.body;
+    const { achievement, title, salesAmount, technique, imageUrl, image } = req.body;
     const studentId = req.user?.id;
     const studentName = (req.user as any)?.name || 'Student';
     if (!achievement && !title) return res.status(400).json({ message: 'Achievement text is required' });
@@ -160,29 +160,42 @@ export const postCommunityWin = async (req: AuthRequest, res: Response): Promise
       studentName,
       achievement: fullAchievement,
       likes: 0,
+      image: imageUrl || image || null,
       timeAgo: 'Just now'
     });
 
+    let awardedXp = 0;
     let updatedPoints = 0;
     if (studentId) {
       const student = await User.findByPk(studentId);
       if (student) {
-        student.points = (student.points || 0) + 50;
-        student.xpPoints = (student.xpPoints || 0) + 50;
-        await student.save();
-        updatedPoints = student.points;
+        // ONLY L3 (Diamond Club) students earn XP from Community Win posts
+        const isL3Student =
+          (student.membershipLevel || '').toUpperCase() === 'L3' ||
+          (student.rank || '').toUpperCase().includes('DIAMOND') ||
+          (student.membershipLevel || '').toUpperCase().includes('DIAMOND');
+
+        if (isL3Student) {
+          student.points = (student.points || 0) + 100;
+          student.xpPoints = (student.xpPoints || 0) + 100;
+          await student.save();
+          awardedXp = 100;
+          updatedPoints = student.points;
+        } else {
+          updatedPoints = student.points;
+        }
       }
     }
 
     return res.status(201).json({
       success: true,
       win,
-      awardedXp: 50,
-      newPoints: updatedPoints,
-      message: 'Win published to community wall! +50 XP awarded!'
+      awardedXp,
+      updatedPoints,
+      message: awardedXp > 0 ? `🎉 +${awardedXp} XP Awarded to Diamond (L3) Member!` : 'Post published to Community Feed successfully!'
     });
   } catch (error) {
-    console.error('Error posting community win:', error);
+    console.error('Error creating community win:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

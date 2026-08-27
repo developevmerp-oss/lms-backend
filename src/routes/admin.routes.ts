@@ -28,6 +28,7 @@ import {
   createLevelTier,
   updateLevelTier,
   deleteLevelTier,
+  getRevenueByTier,
 } from '../controllers/admin.controller';
 
 const router = Router();
@@ -78,6 +79,7 @@ router.get('/levels', getAllLevelTiers);
 router.post('/levels', createLevelTier);
 router.put('/levels/:levelId', updateLevelTier);
 router.delete('/levels/:levelId', deleteLevelTier);
+router.get('/revenue-by-tier', getRevenueByTier);
 
 export default router;
 

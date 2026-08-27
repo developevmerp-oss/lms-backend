@@ -98,6 +98,9 @@ export const login = async (req: Request, res: Response): Promise<any> => {
       return res.status(400).json({ message: 'Invalid email or password' });
     }
 
+    // Update lastLoginAt
+    await user.update({ lastLoginAt: new Date() }).catch(() => {});
+
     // Generate token
     const token = jwt.sign(
       { id: user.id, role: user.role },
@@ -118,6 +121,7 @@ export const login = async (req: Request, res: Response): Promise<any> => {
         membershipLevel: user.membershipLevel || 'L0',
         points: user.points || 0,
         xpPoints: user.xpPoints || 0,
+        lastLoginAt: user.lastLoginAt,
       },
     });
   } catch (error: any) {

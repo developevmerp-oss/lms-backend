@@ -446,6 +446,9 @@ export const createLevelTier = async (req: AuthRequest, res: Response): Promise<
       badgeColor,
       order,
       description,
+      category,
+      validityDays,
+      isPublished,
       discountType,
       discountValue,
       offerStartDate,
@@ -467,6 +470,9 @@ export const createLevelTier = async (req: AuthRequest, res: Response): Promise<
       badgeColor: badgeColor || 'emerald',
       order: Number(order) || 0,
       description: description || '',
+      category: category || 'General',
+      validityDays: validityDays !== undefined && validityDays !== null ? Number(validityDays) : 0,
+      isPublished: isPublished !== undefined ? Boolean(isPublished) : true,
       discountType: discountType || null,
       discountValue: discountValue !== undefined && discountValue !== null ? parseFloat(discountValue) : 0,
       offerStartDate: offerStartDate ? new Date(offerStartDate) : null,
@@ -495,6 +501,9 @@ export const updateLevelTier = async (req: AuthRequest, res: Response): Promise<
       badgeColor,
       order,
       description,
+      category,
+      validityDays,
+      isPublished,
       discountType,
       discountValue,
       offerStartDate,
@@ -515,6 +524,9 @@ export const updateLevelTier = async (req: AuthRequest, res: Response): Promise<
       badgeColor: badgeColor !== undefined ? badgeColor : tier.badgeColor,
       order: order !== undefined ? Number(order) : tier.order,
       description: description !== undefined ? description : tier.description,
+      category: category !== undefined ? category : tier.category,
+      validityDays: validityDays !== undefined ? Number(validityDays) : tier.validityDays,
+      isPublished: isPublished !== undefined ? Boolean(isPublished) : tier.isPublished,
       discountType: discountType !== undefined ? discountType : tier.discountType,
       discountValue: discountValue !== undefined ? parseFloat(discountValue) : tier.discountValue,
       offerStartDate: offerStartDate !== undefined ? (offerStartDate ? new Date(offerStartDate) : null) : tier.offerStartDate,
@@ -540,6 +552,51 @@ export const deleteLevelTier = async (req: AuthRequest, res: Response): Promise<
     return res.status(200).json({ message: 'Level tier deleted successfully' });
   } catch (error) {
     console.error('Error deleting level tier:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// GET Level-wise Revenue Analytics
+export const getRevenueByTier = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const tiers: any[] = await LevelTier.findAll({ order: [['order', 'ASC']] });
+    const students: any[] = await User.findAll({ where: { role: 'student' } });
+    const sales: any[] = await SalesRecord.findAll();
+
+    const tierBreakdown = tiers.map((tier: any) => {
+      const tierCode = (tier.code || '').toUpperCase();
+      const enrolledCount = students.filter(
+        (s: any) => (s.membershipLevel || 'L0').toUpperCase() === tierCode
+      ).length;
+
+      const numPrice = parseInt((tier.price || '0').replace(/[^0-9]/g, '')) || 0;
+      const estimatedRevenue = enrolledCount * numPrice;
+
+      return {
+        id: tier.id,
+        code: tier.code,
+        name: tier.name,
+        price: tier.price || '₹0',
+        numericPrice: numPrice,
+        enrolledCount,
+        estimatedRevenue,
+        icon: tier.icon || '⚡',
+        badgeColor: tier.badgeColor || 'emerald',
+        category: tier.category || 'General',
+        isPublished: tier.isPublished !== false,
+      };
+    });
+
+    const totalRevenue = tierBreakdown.reduce((sum: number, t: any) => sum + t.estimatedRevenue, 0);
+
+    return res.status(200).json({
+      totalRevenue,
+      totalStudents: students.length,
+      totalSalesRecords: sales.length,
+      tiers: tierBreakdown,
+    });
+  } catch (error: any) {
+    console.error('Error fetching revenue by tier:', error);
     return res.status(500).json({ message: 'Internal server error' });
   }
 };

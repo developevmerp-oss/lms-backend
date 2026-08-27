@@ -19,6 +19,8 @@ export interface UserAttributes {
   bio?: string;
   avatarUrl?: string;
   lastRoutineDate?: string;
+  lastLoginAt?: Date | null;
+  membershipExpiresAt?: Date | null;
 
   createdAt?: Date;
   updatedAt?: Date;
@@ -31,7 +33,9 @@ interface User extends UserAttributes {
   readonly updatedAt: Date;
 }
 
-class User extends Model<UserAttributes, UserCreationAttributes> implements UserAttributes {}User.init(
+class User extends Model<UserAttributes, UserCreationAttributes> implements UserAttributes {}
+
+User.init(
   {
     id: {
       type: DataTypes.UUID,
@@ -98,6 +102,14 @@ class User extends Model<UserAttributes, UserCreationAttributes> implements User
     },
     lastRoutineDate: {
       type: DataTypes.STRING,
+      allowNull: true,
+    },
+    lastLoginAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    membershipExpiresAt: {
+      type: DataTypes.DATE,
       allowNull: true,
     },
   },

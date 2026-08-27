@@ -75,6 +75,9 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
     `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "offerStartDate" TIMESTAMP WITH TIME ZONE;`,
     `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "offerEndDate" TIMESTAMP WITH TIME ZONE;`,
     `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "offerActive" BOOLEAN DEFAULT false;`,
+    `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "category" VARCHAR(100) DEFAULT 'General';`,
+    `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "validityDays" INTEGER DEFAULT 0;`,
+    `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "isPublished" BOOLEAN DEFAULT true;`,
 
     // --- WEBINAR EVENTS TABLE ---
     `CREATE TABLE IF NOT EXISTS "WebinarEvents" (
@@ -124,6 +127,8 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
     `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "membershipLevel" VARCHAR(255) DEFAULT 'L0';`,
     `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "xpPoints" INTEGER DEFAULT 0;`,
     `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "lastRoutineDate" VARCHAR(50);`,
+    `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "lastLoginAt" TIMESTAMP WITH TIME ZONE;`,
+    `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "membershipExpiresAt" TIMESTAMP WITH TIME ZONE;`,
 
     // --- PORTFOLIOS TABLE ---
     `ALTER TABLE "Portfolios" ADD COLUMN IF NOT EXISTS "imageUrl" TEXT;`,
