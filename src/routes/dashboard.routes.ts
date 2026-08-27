@@ -7,6 +7,7 @@ import {
   postCommunityWin,
   getCommunityWins,
   getPublicBadges,
+  getPublicCourses,
   getPublicLevelTiers,
   completeDailyRoutine,
   addStudentSalesRecord,
@@ -19,6 +20,9 @@ const router = Router();
 
 // Public / Student levels route
 router.get('/levels', getPublicLevelTiers);
+
+// Public / Student courses route (For landing page level progression)
+router.get('/courses', getPublicCourses);
 
 // Public / Student events list route
 router.get('/events', getPublicEventsList);

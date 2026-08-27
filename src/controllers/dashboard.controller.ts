@@ -352,3 +352,16 @@ export const getPublicBadges = async (req: Request, res: Response): Promise<any>
     return res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+// GET all public courses (For landing page dynamic level mapping)
+export const getPublicCourses = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const courses = await db.Course.findAll({
+      order: [['order', 'ASC'], ['createdAt', 'ASC']]
+    });
+    return res.status(200).json(courses);
+  } catch (error) {
+    console.error('Error fetching public courses:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};

@@ -13,8 +13,8 @@ import { authenticate, authorize } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// Everyone (authenticated) can get courses
-router.get('/', authenticate, getCourses);
+// Everyone (public / authenticated) can get courses
+router.get('/', getCourses);
 
 // Admin course management
 router.post('/seed', authenticate, authorize(['admin']), triggerSeedCourses);
