@@ -366,16 +366,24 @@ export const getAllNotifications = async (req: AuthRequest, res: Response): Prom
 // CREATE community win
 export const createCommunityWin = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
-    const { studentName, achievement, likes, timeAgo } = req.body;
+    const { studentName, achievement, title, likes, timeAgo, image, imageUrl, salesAmount, technique } = req.body;
 
-    if (!studentName || !achievement) {
-      return res.status(400).json({ message: 'studentName and achievement are required' });
+    const name = studentName || 'Patel Vrajangna (Admin)';
+    const mainTitle = achievement || title;
+
+    if (!mainTitle) {
+      return res.status(400).json({ message: 'Achievement title is required' });
     }
 
+    let fullAchievement = mainTitle;
+    if (salesAmount) fullAchievement += ` (₹${Number(salesAmount).toLocaleString('en-IN')} sale!)`;
+    if (technique) fullAchievement += ` • Technique: ${technique}`;
+
     const win = await CommunityWin.create({
-      studentName,
-      achievement,
+      studentName: name,
+      achievement: fullAchievement,
       likes: likes || 0,
+      image: image || imageUrl || null,
       timeAgo: timeAgo || 'Just now'
     });
     return res.status(201).json(win);
