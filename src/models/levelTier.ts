@@ -12,6 +12,11 @@ export interface LevelTierAttributes {
   badgeColor: string; // e.g. 'emerald', 'slate', 'amber', 'cyan', 'purple'
   order: number;
   description?: string;
+  discountType?: 'percentage' | 'flat' | string | null;
+  discountValue?: number | null;
+  offerStartDate?: Date | string | null;
+  offerEndDate?: Date | string | null;
+  offerActive?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -29,6 +34,11 @@ class LevelTier extends Model<LevelTierAttributes, LevelTierCreationAttributes> 
   public badgeColor!: string;
   public order!: number;
   public description?: string;
+  public discountType?: string | null;
+  public discountValue?: number | null;
+  public offerStartDate?: Date | null;
+  public offerEndDate?: Date | null;
+  public offerActive?: boolean;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -79,8 +89,30 @@ LevelTier.init(
       defaultValue: 0,
     },
     description: {
-      type: DataTypes.STRING,
+      type: DataTypes.TEXT,
       allowNull: true,
+    },
+    discountType: {
+      type: DataTypes.STRING,
+      allowNull: true, // 'percentage' | 'flat'
+    },
+    discountValue: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+      defaultValue: 0,
+    },
+    offerStartDate: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    offerEndDate: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    offerActive: {
+      type: DataTypes.BOOLEAN,
+      allowNull: true,
+      defaultValue: false,
     },
   },
   {

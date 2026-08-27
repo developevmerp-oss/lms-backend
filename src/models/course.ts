@@ -8,6 +8,11 @@ export interface CourseAttributes {
   image?: string;
   levelCode?: string; // 'L0' | 'L1' | 'L2' | 'L3' | 'L3+'
   order?: number;
+  discountType?: 'percentage' | 'flat' | string | null;
+  discountValue?: number | null;
+  offerStartDate?: Date | string | null;
+  offerEndDate?: Date | string | null;
+  offerActive?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -21,6 +26,11 @@ interface Course extends CourseAttributes {
   image: string;
   levelCode: string;
   order: number;
+  discountType: string | null;
+  discountValue: number | null;
+  offerStartDate: Date | null;
+  offerEndDate: Date | null;
+  offerActive: boolean;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
@@ -56,6 +66,28 @@ Course.init(
       type: DataTypes.INTEGER,
       allowNull: false,
       defaultValue: 0,
+    },
+    discountType: {
+      type: DataTypes.STRING,
+      allowNull: true, // 'percentage' | 'flat'
+    },
+    discountValue: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+      defaultValue: 0,
+    },
+    offerStartDate: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    offerEndDate: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    offerActive: {
+      type: DataTypes.BOOLEAN,
+      allowNull: true,
+      defaultValue: false,
     },
   },
   {

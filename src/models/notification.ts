@@ -7,6 +7,9 @@ export interface NotificationAttributes {
   title: string;
   message: string;
   isRead: boolean;
+  type?: string; // 'info' | 'alert' | 'offer' | 'event' | 'webinar'
+  link?: string;
+  targetAudience?: string; // 'all' | 'L0' | 'L1' | 'L2' | 'L3' | 'webinar'
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -19,6 +22,9 @@ class Notification extends Model<NotificationAttributes, NotificationCreationAtt
   public title!: string;
   public message!: string;
   public isRead!: boolean;
+  public type!: string;
+  public link!: string;
+  public targetAudience!: string;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -46,6 +52,20 @@ Notification.init(
     isRead: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
+    },
+    type: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      defaultValue: 'info',
+    },
+    link: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    targetAudience: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      defaultValue: 'all',
     },
   },
   {

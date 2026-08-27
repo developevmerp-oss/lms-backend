@@ -19,6 +19,8 @@ import {
   enrollStudentInCourse,
   sendNotification,
   getAllNotifications,
+  broadcastNotification,
+  getNotificationBroadcasts,
   createCommunityWin,
   getAllCommunityWins,
   deleteCommunityWin,
@@ -62,6 +64,7 @@ router.put('/students/:studentId/skills', updateStudentSkills);
 router.post('/students/:studentId/courses', enrollStudentInCourse);
 
 // Notifications
+router.post('/notifications/broadcast', broadcastNotification);
 router.post('/students/:studentId/notifications', sendNotification);
 router.get('/notifications', getAllNotifications);
 

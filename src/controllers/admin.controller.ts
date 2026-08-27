@@ -436,7 +436,22 @@ export const getAllLevelTiers = async (req: Request, res: Response): Promise<any
 // CREATE a new level tier
 export const createLevelTier = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
-    const { code, name, price, minPoints, maxPoints, icon, badgeColor, order, description } = req.body;
+    const {
+      code,
+      name,
+      price,
+      minPoints,
+      maxPoints,
+      icon,
+      badgeColor,
+      order,
+      description,
+      discountType,
+      discountValue,
+      offerStartDate,
+      offerEndDate,
+      offerActive,
+    } = req.body;
 
     if (!code || !name) {
       return res.status(400).json({ message: 'Code and name are required' });
@@ -451,7 +466,12 @@ export const createLevelTier = async (req: AuthRequest, res: Response): Promise<
       icon: icon || '⚡',
       badgeColor: badgeColor || 'emerald',
       order: Number(order) || 0,
-      description: description || ''
+      description: description || '',
+      discountType: discountType || null,
+      discountValue: discountValue !== undefined && discountValue !== null ? parseFloat(discountValue) : 0,
+      offerStartDate: offerStartDate ? new Date(offerStartDate) : null,
+      offerEndDate: offerEndDate ? new Date(offerEndDate) : null,
+      offerActive: Boolean(offerActive),
     });
 
     return res.status(201).json(tier);
@@ -465,7 +485,22 @@ export const createLevelTier = async (req: AuthRequest, res: Response): Promise<
 export const updateLevelTier = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const { levelId } = req.params;
-    const { code, name, price, minPoints, maxPoints, icon, badgeColor, order, description } = req.body;
+    const {
+      code,
+      name,
+      price,
+      minPoints,
+      maxPoints,
+      icon,
+      badgeColor,
+      order,
+      description,
+      discountType,
+      discountValue,
+      offerStartDate,
+      offerEndDate,
+      offerActive,
+    } = req.body;
 
     const tier = await LevelTier.findByPk(levelId);
     if (!tier) return res.status(404).json({ message: 'Level tier not found' });
@@ -479,7 +514,12 @@ export const updateLevelTier = async (req: AuthRequest, res: Response): Promise<
       icon: icon !== undefined ? icon : tier.icon,
       badgeColor: badgeColor !== undefined ? badgeColor : tier.badgeColor,
       order: order !== undefined ? Number(order) : tier.order,
-      description: description !== undefined ? description : tier.description
+      description: description !== undefined ? description : tier.description,
+      discountType: discountType !== undefined ? discountType : tier.discountType,
+      discountValue: discountValue !== undefined ? parseFloat(discountValue) : tier.discountValue,
+      offerStartDate: offerStartDate !== undefined ? (offerStartDate ? new Date(offerStartDate) : null) : tier.offerStartDate,
+      offerEndDate: offerEndDate !== undefined ? (offerEndDate ? new Date(offerEndDate) : null) : tier.offerEndDate,
+      offerActive: offerActive !== undefined ? Boolean(offerActive) : tier.offerActive,
     });
 
     return res.status(200).json(tier);
@@ -500,6 +540,78 @@ export const deleteLevelTier = async (req: AuthRequest, res: Response): Promise<
     return res.status(200).json({ message: 'Level tier deleted successfully' });
   } catch (error) {
     console.error('Error deleting level tier:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// ===== TARGETED BROADCAST NOTIFICATIONS =====
+
+// SEND targeted broadcast notification (all, L0, L1, L2, L3, webinar)
+export const broadcastNotification = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { title, message, targetAudience, type, link } = req.body;
+
+    if (!title || !message) {
+      return res.status(400).json({ message: 'Title and message are required' });
+    }
+
+    let targetUsers: any[] = [];
+    if (targetAudience === 'all' || !targetAudience) {
+      targetUsers = await User.findAll({ where: { role: 'student' } });
+    } else if (['L0', 'L1', 'L2', 'L3'].includes(targetAudience)) {
+      targetUsers = await User.findAll({
+        where: {
+          role: 'student',
+          membershipLevel: targetAudience,
+        },
+      });
+    } else if (targetAudience === 'webinar') {
+      // Send to all students / webinar registrants
+      targetUsers = await User.findAll({ where: { role: 'student' } });
+    }
+
+    if (targetUsers.length === 0) {
+      return res.status(200).json({
+        message: `No active students found in target group: ${targetAudience}`,
+        count: 0,
+      });
+    }
+
+    const notificationsToCreate = targetUsers.map((u) => ({
+      userId: u.id,
+      title,
+      message,
+      type: type || 'info',
+      link: link || '',
+      targetAudience: targetAudience || 'all',
+      isRead: false,
+    }));
+
+    await Notification.bulkCreate(notificationsToCreate);
+
+    return res.status(200).json({
+      message: `Notification broadcasted successfully to ${notificationsToCreate.length} students (${targetAudience})!`,
+      count: notificationsToCreate.length,
+    });
+  } catch (error: any) {
+    console.error('Error broadcasting notification:', error);
+    return res.status(500).json({ message: 'Internal server error', error: error?.message });
+  }
+};
+
+// GET recent notifications history
+export const getNotificationBroadcasts = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const notifications = await Notification.findAll({
+      order: [['createdAt', 'DESC']],
+      limit: 50,
+      include: [
+        { model: User, as: 'user', attributes: ['id', 'name', 'email', 'membershipLevel'] },
+      ],
+    });
+    return res.status(200).json(notifications);
+  } catch (error: any) {
+    console.error('Error fetching notification broadcasts:', error);
     return res.status(500).json({ message: 'Internal server error' });
   }
 };

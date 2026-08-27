@@ -300,7 +300,19 @@ export const getCourses = async (req: Request, res: Response): Promise<any> => {
 // Create a new course
 export const createCourse = async (req: Request, res: Response): Promise<any> => {
   try {
-    const { title, description, image, levelCode, order } = req.body;
+    const {
+      title,
+      description,
+      image,
+      levelCode,
+      order,
+      discountType,
+      discountValue,
+      offerStartDate,
+      offerEndDate,
+      offerActive,
+    } = req.body;
+
     try {
       await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "levelCode" VARCHAR(255) DEFAULT 'L0';`);
       await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "order" INTEGER DEFAULT 0;`);
@@ -311,7 +323,12 @@ export const createCourse = async (req: Request, res: Response): Promise<any> =>
       description,
       image,
       levelCode: levelCode || 'L0',
-      order: parseInt(order) || 0
+      order: parseInt(order) || 0,
+      discountType: discountType || null,
+      discountValue: discountValue !== undefined && discountValue !== null ? parseFloat(discountValue) : 0,
+      offerStartDate: offerStartDate ? new Date(offerStartDate) : null,
+      offerEndDate: offerEndDate ? new Date(offerEndDate) : null,
+      offerActive: Boolean(offerActive),
     });
     res.status(201).json({ message: 'Course created successfully', course });
   } catch (error: any) {
@@ -324,16 +341,33 @@ export const createCourse = async (req: Request, res: Response): Promise<any> =>
 export const updateCourse = async (req: Request, res: Response): Promise<any> => {
   try {
     const { id } = req.params;
-    const { title, description, image, levelCode, order } = req.body;
+    const {
+      title,
+      description,
+      image,
+      levelCode,
+      order,
+      discountType,
+      discountValue,
+      offerStartDate,
+      offerEndDate,
+      offerActive,
+    } = req.body;
+
     const course = await Course.findByPk(id);
     if (!course) return res.status(404).json({ message: 'Course not found' });
 
     await course.update({
-      title,
-      description,
-      image,
+      title: title !== undefined ? title : course.title,
+      description: description !== undefined ? description : course.description,
+      image: image !== undefined ? image : course.image,
       levelCode: levelCode || course.levelCode,
-      order: order !== undefined ? parseInt(order) : course.order
+      order: order !== undefined ? parseInt(order) : course.order,
+      discountType: discountType !== undefined ? discountType : course.discountType,
+      discountValue: discountValue !== undefined ? parseFloat(discountValue) : course.discountValue,
+      offerStartDate: offerStartDate !== undefined ? (offerStartDate ? new Date(offerStartDate) : null) : course.offerStartDate,
+      offerEndDate: offerEndDate !== undefined ? (offerEndDate ? new Date(offerEndDate) : null) : course.offerEndDate,
+      offerActive: offerActive !== undefined ? Boolean(offerActive) : course.offerActive,
     });
     res.status(200).json({ message: 'Course updated successfully', course });
   } catch (error: any) {

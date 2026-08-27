@@ -43,6 +43,11 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
     `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "levelCode" VARCHAR(255) DEFAULT 'L0';`,
     `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "order" INTEGER DEFAULT 0;`,
     `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "image" TEXT;`,
+    `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "discountType" VARCHAR(50);`,
+    `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "discountValue" FLOAT DEFAULT 0;`,
+    `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "offerStartDate" TIMESTAMP WITH TIME ZONE;`,
+    `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "offerEndDate" TIMESTAMP WITH TIME ZONE;`,
+    `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "offerActive" BOOLEAN DEFAULT false;`,
 
     // --- LEVEL TIERS TABLE ---
     `CREATE TABLE IF NOT EXISTS "LevelTiers" (
@@ -65,6 +70,11 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
     `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "icon" VARCHAR(255);`,
     `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "badgeColor" VARCHAR(255);`,
     `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "order" INTEGER DEFAULT 0;`,
+    `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "discountType" VARCHAR(50);`,
+    `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "discountValue" FLOAT DEFAULT 0;`,
+    `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "offerStartDate" TIMESTAMP WITH TIME ZONE;`,
+    `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "offerEndDate" TIMESTAMP WITH TIME ZONE;`,
+    `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "offerActive" BOOLEAN DEFAULT false;`,
 
     // --- WEBINAR EVENTS TABLE ---
     `CREATE TABLE IF NOT EXISTS "WebinarEvents" (
@@ -125,6 +135,11 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
     `ALTER TABLE "CommunityWins" ADD COLUMN IF NOT EXISTS "comments" JSONB DEFAULT '[]'::jsonb;`,
     `ALTER TABLE "CommunityWins" ADD COLUMN IF NOT EXISTS "likes" INTEGER DEFAULT 0;`,
     `ALTER TABLE "CommunityWins" ADD COLUMN IF NOT EXISTS "image" TEXT;`,
+
+    // --- NOTIFICATIONS TABLE ---
+    `ALTER TABLE "Notifications" ADD COLUMN IF NOT EXISTS "type" VARCHAR(50) DEFAULT 'info';`,
+    `ALTER TABLE "Notifications" ADD COLUMN IF NOT EXISTS "link" VARCHAR(255);`,
+    `ALTER TABLE "Notifications" ADD COLUMN IF NOT EXISTS "targetAudience" VARCHAR(50) DEFAULT 'all';`,
 
     // --- BADGES TABLE ---
     `ALTER TABLE "Badges" ADD COLUMN IF NOT EXISTS "icon" VARCHAR(255);`,
