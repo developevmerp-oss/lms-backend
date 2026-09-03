@@ -5,27 +5,32 @@ import { processStudentStreakAndWeekStatus } from '../utils/streakHelper';
 
 const { User, Course, Submission, Skill, Badge, Portfolio, Milestone, SalesRecord, Notification } = db;
 
-// In-memory cache for level tiers (barely changes, no need to re-query every request)
+// In-memory cache for level tiers
 let cachedLevelTiers: any[] | null = null;
 let levelTierCacheAt = 0;
-const LEVEL_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const LEVEL_CACHE_TTL_MS = 5000; // 5 seconds cache for fast response and instant updates
+
+export function clearLevelTierCache() {
+  cachedLevelTiers = null;
+  levelTierCacheAt = 0;
+}
 
 async function getLevelTiers() {
   const now = Date.now();
   if (cachedLevelTiers && (now - levelTierCacheAt) < LEVEL_CACHE_TTL_MS) {
     return cachedLevelTiers;
   }
-  let tiers = await db.LevelTier.findAll({ order: [['minPoints', 'ASC'], ['order', 'ASC']] });
+  let tiers = await db.LevelTier.findAll({ order: [['order', 'ASC'], ['minPoints', 'ASC']] });
   if (!tiers || tiers.length === 0) {
     const DEFAULT_LEVELS = [
-      { code: 'L0', name: 'Fast Track: Resin FastStart Bundle', minPoints: 0, maxPoints: 499, icon: '⚡', badgeColor: 'emerald', order: 0, description: 'Foundations, chemistry, and first creations' },
-      { code: 'L1', name: 'Silver Membership: Explore Membership', minPoints: 500, maxPoints: 4999, icon: '🥈', badgeColor: 'slate', order: 1, description: 'Core techniques, first client sale, and portfolio building' },
-      { code: 'L2', name: 'Gold Membership: Master Membership', minPoints: 5000, maxPoints: 9999, icon: '🏆', badgeColor: 'amber', order: 2, description: 'High-ticket geode clocks, bridal preservation, and consistent revenue' },
-      { code: 'L3', name: 'Diamond Membership: Renaissance Certification', minPoints: 10000, maxPoints: 49999, icon: '💎', badgeColor: 'cyan', order: 3, description: 'Scale beyond ₹50K/month, furniture river tables, and corporate orders' },
-      { code: 'L3+', name: 'Masters Club: Artistry Pinnacle', minPoints: 50000, maxPoints: null, icon: '👑', badgeColor: 'purple', order: 4, description: 'Offline city workshops, mentorship, and signature brand empire' },
+      { code: 'L0', name: 'Fast Track: Resin FastStart Bundle', minPoints: 0, maxPoints: 499, icon: '⚡', badgeColor: 'emerald', order: 0, description: 'Foundations, chemistry, and first creations', price: '₹499' },
+      { code: 'L1', name: 'Silver Membership: Explore Membership', minPoints: 500, maxPoints: 4999, icon: '🥈', badgeColor: 'slate', order: 1, description: 'Core techniques, first client sale, and portfolio building', price: '₹4,999' },
+      { code: 'L2', name: 'Gold Membership: Master Membership', minPoints: 5000, maxPoints: 9999, icon: '🏆', badgeColor: 'amber', order: 2, description: 'High-ticket geode clocks, bridal preservation, and consistent revenue', price: '₹19,999' },
+      { code: 'L3', name: 'Diamond Membership: Renaissance Certification', minPoints: 10000, maxPoints: 49999, icon: '💎', badgeColor: 'cyan', order: 3, description: 'Scale beyond ₹50K/month, furniture river tables, and corporate orders', price: '₹59,999' },
+      { code: 'L3+', name: 'Masters Club: Artistry Pinnacle', minPoints: 50000, maxPoints: null, icon: '👑', badgeColor: 'purple', order: 4, description: 'Offline city workshops, mentorship, and signature brand empire', price: 'Exclusive' },
     ];
     await db.LevelTier.bulkCreate(DEFAULT_LEVELS);
-    tiers = await db.LevelTier.findAll({ order: [['minPoints', 'ASC'], ['order', 'ASC']] });
+    tiers = await db.LevelTier.findAll({ order: [['order', 'ASC'], ['minPoints', 'ASC']] });
   }
   cachedLevelTiers = tiers;
   levelTierCacheAt = now;

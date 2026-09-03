@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import db from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { clearLevelTierCache } from './dashboard.controller';
 
 const { User, Skill, Badge, UserBadge, Portfolio, Milestone, SalesRecord, Course, UserCourse, Notification, CommunityWin, LevelTier } = db;
 
@@ -499,6 +500,7 @@ export const createLevelTier = async (req: AuthRequest, res: Response): Promise<
       offerTitle: offerTitle || 'Special Level Offer',
     });
 
+    clearLevelTierCache();
     return res.status(201).json(tier);
   } catch (error) {
     console.error('Error creating level tier:', error);
@@ -555,6 +557,7 @@ export const updateLevelTier = async (req: AuthRequest, res: Response): Promise<
       offerTitle: offerTitle !== undefined ? offerTitle : tier.offerTitle,
     });
 
+    clearLevelTierCache();
     return res.status(200).json(tier);
   } catch (error) {
     console.error('Error updating level tier:', error);
@@ -570,6 +573,7 @@ export const deleteLevelTier = async (req: AuthRequest, res: Response): Promise<
     if (!tier) return res.status(404).json({ message: 'Level tier not found' });
 
     await tier.destroy();
+    clearLevelTierCache();
     return res.status(200).json({ message: 'Level tier deleted successfully' });
   } catch (error) {
     console.error('Error deleting level tier:', error);
