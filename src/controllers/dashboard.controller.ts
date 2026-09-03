@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import db from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { processStudentStreakAndWeekStatus } from '../utils/streakHelper';
 
 const { User, Course, Submission, Skill, Badge, Portfolio, Milestone, SalesRecord, Notification } = db;
 
@@ -89,10 +90,14 @@ export const getStudentStats = async (req: AuthRequest, res: Response): Promise<
       daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
     }
 
+    // Process streak reset and calculate current week status
+    const { streak: calculatedStreak, weekStatus } = await processStudentStreakAndWeekStatus(student);
+
     res.status(200).json({
       points: student.points,
       xpPoints: student.xpPoints,
-      streak: student.streak,
+      streak: calculatedStreak,
+      weekStatus,
       membershipLevel: currentTier?.name || student.membershipLevel,
       currentTier,
       levelTiers,
@@ -301,23 +306,32 @@ export const completeDailyRoutine = async (req: AuthRequest, res: Response): Pro
       });
     }
 
-    // First time completing today: increment streak & award +10 XP
+    // First time completing today: record active history, increment streak & award +10 XP
     const newStreak = (student.streak || 0) + 1;
     const newPoints = (student.points || 0) + 10;
     const newXp = (student.xpPoints || 0) + 10;
+
+    let activeHistory: string[] = Array.isArray(student.activeDaysHistory) ? student.activeDaysHistory : [];
+    if (!activeHistory.includes(todayStr)) {
+      activeHistory = [...activeHistory, todayStr];
+    }
 
     await student.update({
       streak: newStreak,
       points: newPoints,
       xpPoints: newXp,
-      lastRoutineDate: todayStr
+      lastRoutineDate: todayStr,
+      activeDaysHistory: activeHistory
     } as any);
+
+    const { weekStatus } = await processStudentStreakAndWeekStatus(student);
 
     return res.status(200).json({
       success: true,
       alreadyCompletedToday: false,
       streak: newStreak,
       points: newPoints,
+      weekStatus,
       xpAwarded: 10,
       message: 'Awesome job! +10 XP awarded and streak kept active!'
     });

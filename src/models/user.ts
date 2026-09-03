@@ -20,6 +20,7 @@ export interface UserAttributes {
   avatarUrl?: string;
   lastRoutineDate?: string;
   lastLoginAt?: Date | null;
+  activeDaysHistory?: string[];
   membershipExpiresAt?: Date | null;
 
   createdAt?: Date;
@@ -107,6 +108,10 @@ User.init(
     lastLoginAt: {
       type: DataTypes.DATE,
       allowNull: true,
+    },
+    activeDaysHistory: {
+      type: DataTypes.JSON,
+      defaultValue: [],
     },
     membershipExpiresAt: {
       type: DataTypes.DATE,

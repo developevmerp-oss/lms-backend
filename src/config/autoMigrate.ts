@@ -144,6 +144,7 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
     `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "xpPoints" INTEGER DEFAULT 0;`,
     `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "lastRoutineDate" VARCHAR(50);`,
     `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "lastLoginAt" TIMESTAMP WITH TIME ZONE;`,
+    `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "activeDaysHistory" JSONB DEFAULT '[]'::jsonb;`,
     `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "membershipExpiresAt" TIMESTAMP WITH TIME ZONE;`,
 
     // --- PORTFOLIOS TABLE ---
