@@ -357,16 +357,48 @@ export const updateCourse = async (req: Request, res: Response): Promise<any> =>
     const course = await Course.findByPk(id);
     if (!course) return res.status(404).json({ message: 'Course not found' });
 
+    let parsedOrder = course.order;
+    if (order !== undefined && order !== null && order !== '') {
+      const p = parseInt(order, 10);
+      if (!isNaN(p)) parsedOrder = p;
+    }
+
+    let parsedDiscountValue = course.discountValue;
+    if (discountValue !== undefined && discountValue !== null && discountValue !== '') {
+      const p = parseFloat(discountValue);
+      if (!isNaN(p)) parsedDiscountValue = p;
+    }
+
+    let parsedStartDate = course.offerStartDate;
+    if (offerStartDate !== undefined) {
+      if (!offerStartDate) {
+        parsedStartDate = null;
+      } else {
+        const d = new Date(offerStartDate);
+        if (!isNaN(d.getTime())) parsedStartDate = d;
+      }
+    }
+
+    let parsedEndDate = course.offerEndDate;
+    if (offerEndDate !== undefined) {
+      if (!offerEndDate) {
+        parsedEndDate = null;
+      } else {
+        const d = new Date(offerEndDate);
+        if (!isNaN(d.getTime())) parsedEndDate = d;
+      }
+    }
+
     await course.update({
       title: title !== undefined ? title : course.title,
       description: description !== undefined ? description : course.description,
       image: image !== undefined ? image : course.image,
       levelCode: levelCode || course.levelCode,
-      order: order !== undefined ? parseInt(order) : course.order,
+      order: parsedOrder,
       discountType: discountType !== undefined ? discountType : course.discountType,
-      discountValue: discountValue !== undefined ? parseFloat(discountValue) : course.discountValue,
-      offerStartDate: offerStartDate !== undefined ? (offerStartDate ? new Date(offerStartDate) : null) : course.offerStartDate,
-      offerEndDate: offerEndDate !== undefined ? (offerEndDate ? new Date(offerEndDate) : null) : course.offerEndDate,
+      discountValue: parsedDiscountValue,
+      offerStartDate: parsedStartDate,
+      offerEndDate: parsedEndDate,
       offerActive: offerActive !== undefined ? Boolean(offerActive) : course.offerActive,
     });
     res.status(200).json({ message: 'Course updated successfully', course });
