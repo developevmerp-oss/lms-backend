@@ -13,7 +13,6 @@ export interface RewardAttributes {
 
 export interface RewardCreationAttributes extends Optional<RewardAttributes, 'id'> {}
 
-
 interface Reward extends RewardAttributes {
   id: string;
   title: string;
@@ -24,8 +23,7 @@ interface Reward extends RewardAttributes {
   readonly updatedAt: Date;
 }
 
-class Reward extends Model<RewardAttributes, RewardCreationAttributes> implements RewardAttributes {
-}
+class Reward extends Model<RewardAttributes, RewardCreationAttributes> implements RewardAttributes {}
 
 Reward.init(
   {
@@ -48,7 +46,7 @@ Reward.init(
       defaultValue: 0,
     },
     imageUrl: {
-      type: DataTypes.STRING,
+      type: DataTypes.TEXT,
       allowNull: true,
     },
   },

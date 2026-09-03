@@ -59,9 +59,9 @@ export const createReward = async (req: Request, res: Response): Promise<any> =>
     const { title, description, pointCost, imageUrl } = req.body;
     const reward = await Reward.create({ title, description, pointCost: Number(pointCost) || 0, imageUrl });
     return res.status(201).json({ message: 'Reward created', reward });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating reward:', error);
-    return res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ message: error?.message || 'Internal server error' });
   }
 };
 
