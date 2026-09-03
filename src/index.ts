@@ -29,6 +29,16 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
+import path from 'path';
+import fs from 'fs';
+
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir));
+
 // ── Health endpoint (must be before auth middleware) ──
 app.get('/api/health', (_req, res) => {
   res.status(200).json({ status: 'ok', message: 'LMS Backend is running', ts: Date.now() });
