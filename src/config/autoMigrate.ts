@@ -48,6 +48,12 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
     `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "offerStartDate" TIMESTAMP WITH TIME ZONE;`,
     `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "offerEndDate" TIMESTAMP WITH TIME ZONE;`,
     `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "offerActive" BOOLEAN DEFAULT false;`,
+    `ALTER TABLE "Courses" ALTER COLUMN "image" TYPE TEXT;`,
+    `ALTER TABLE "Courses" ALTER COLUMN "description" TYPE TEXT;`,
+    `ALTER TABLE "Courses" ALTER COLUMN "title" TYPE TEXT;`,
+    `ALTER TABLE "Chapters" ALTER COLUMN "videoUrl" TYPE TEXT;`,
+    `ALTER TABLE "Chapters" ALTER COLUMN "pdfUrl" TYPE TEXT;`,
+    `ALTER TABLE "Chapters" ALTER COLUMN "title" TYPE TEXT;`,
 
     // --- LEVEL TIERS TABLE ---
     `CREATE TABLE IF NOT EXISTS "LevelTiers" (

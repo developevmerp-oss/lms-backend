@@ -14,7 +14,6 @@ export interface ChapterAttributes {
 
 export interface ChapterCreationAttributes extends Optional<ChapterAttributes, 'id'> {}
 
-
 interface Chapter extends ChapterAttributes {
   id: string;
   title: string;
@@ -25,8 +24,7 @@ interface Chapter extends ChapterAttributes {
   readonly updatedAt: Date;
 }
 
-class Chapter extends Model<ChapterAttributes, ChapterCreationAttributes> implements ChapterAttributes {
-}
+class Chapter extends Model<ChapterAttributes, ChapterCreationAttributes> implements ChapterAttributes {}
 
 Chapter.init(
   {
@@ -37,15 +35,15 @@ Chapter.init(
       allowNull: false,
     },
     title: {
-      type: DataTypes.STRING,
+      type: DataTypes.TEXT,
       allowNull: false,
     },
     videoUrl: {
-      type: DataTypes.STRING,
+      type: DataTypes.TEXT,
       allowNull: true,
     },
     pdfUrl: {
-      type: DataTypes.STRING,
+      type: DataTypes.TEXT,
       allowNull: true,
     },
     courseId: {
