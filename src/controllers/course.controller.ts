@@ -203,6 +203,12 @@ export const seedDefaultCurriculum = async () => {
       await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "order" INTEGER DEFAULT 0;`);
     } catch (_) {}
 
+    const existingCount = await Course.count();
+    if (existingCount >= DEFAULT_CURRICULUM_COURSES.length) {
+      console.log('✅ Level-wise courses already seeded in database.');
+      return;
+    }
+
     console.log('Ensuring all 30 level-wise courses exist in database...');
     for (const item of DEFAULT_CURRICULUM_COURSES) {
       let [course, created] = await Course.findOrCreate({

@@ -65,8 +65,8 @@ const startServer = async () => {
     // Run safe auto-migrations for missing columns and large data types
     await runAutoMigrations(sequelize);
 
-    // Seed 30 curriculum courses now that tables are synchronized
-    await seedDefaultCurriculum();
+    // Seed 30 curriculum courses asynchronously without blocking server readiness
+    seedDefaultCurriculum().catch((err) => console.error('Seeding error:', err));
 
     console.log('✅ Ready to serve requests');
   } catch (error) {
