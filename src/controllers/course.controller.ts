@@ -249,7 +249,7 @@ export const triggerSeedCourses = async (req: Request, res: Response): Promise<a
         ['createdAt', 'ASC']
       ],
       include: [
-        { model: Chapter, as: 'chapters', order: [['createdAt', 'ASC']] }
+        { model: Chapter, as: 'chapters' }
       ]
     });
     res.status(200).json({ message: 'All 30 level-wise courses synced to database successfully!', courses });
@@ -270,7 +270,7 @@ export const getCourses = async (req: Request, res: Response): Promise<any> => {
           ['createdAt', 'ASC']
         ],
         include: [
-          { model: Chapter, as: 'chapters', order: [['createdAt', 'ASC']] },
+          { model: Chapter, as: 'chapters' },
           { model: Assignment, as: 'assignments' }
         ]
       });
@@ -285,7 +285,7 @@ export const getCourses = async (req: Request, res: Response): Promise<any> => {
       const fallbackCourses = await Course.findAll({
         order: [['createdAt', 'ASC']],
         include: [
-          { model: Chapter, as: 'chapters', order: [['createdAt', 'ASC']] },
+          { model: Chapter, as: 'chapters' },
           { model: Assignment, as: 'assignments' }
         ]
       });
