@@ -268,8 +268,9 @@ export const triggerSeedCourses = async (req: Request, res: Response): Promise<a
 // Get all courses with Level-wise ordering
 export const getCourses = async (req: Request, res: Response): Promise<any> => {
   try {
+    let rawCourses: any[] = [];
     try {
-      const courses = await Course.findAll({
+      rawCourses = await Course.findAll({
         order: [
           ['levelCode', 'ASC'],
           ['order', 'ASC'],
@@ -280,23 +281,36 @@ export const getCourses = async (req: Request, res: Response): Promise<any> => {
           { model: Assignment, as: 'assignments' }
         ]
       });
-      return res.status(200).json(courses);
     } catch (dbErr: any) {
-      // Column might not exist yet; run quick patch
       try {
         await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "levelCode" VARCHAR(255) DEFAULT 'L0';`);
         await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "order" INTEGER DEFAULT 0;`);
       } catch (_) {}
 
-      const fallbackCourses = await Course.findAll({
+      rawCourses = await Course.findAll({
         order: [['createdAt', 'ASC']],
         include: [
           { model: Chapter, as: 'chapters' },
           { model: Assignment, as: 'assignments' }
         ]
       });
-      return res.status(200).json(fallbackCourses);
     }
+
+    // Sanitize any large Base64 data URLs in videoUrl/pdfUrl to prevent 502 payload crashes
+    const sanitizedCourses = rawCourses.map((c: any) => {
+      const courseJson = typeof c.toJSON === 'function' ? c.toJSON() : c;
+      if (Array.isArray(courseJson.chapters)) {
+        courseJson.chapters = courseJson.chapters.map((ch: any) => {
+          if (ch.videoUrl && ch.videoUrl.length > 500 && ch.videoUrl.startsWith('data:')) {
+            ch.videoUrl = ''; // Omit giant base64 payload from list view
+          }
+          return ch;
+        });
+      }
+      return courseJson;
+    });
+
+    return res.status(200).json(sanitizedCourses);
   } catch (error: any) {
     console.error('Error fetching courses:', error);
     res.status(500).json({ message: 'Internal server error', error: error?.message });
