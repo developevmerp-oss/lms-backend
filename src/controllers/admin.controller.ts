@@ -3,7 +3,7 @@ import db from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { clearLevelTierCache } from './dashboard.controller';
 
-const { User, Skill, Badge, UserBadge, Portfolio, Milestone, SalesRecord, Course, UserCourse, Notification, CommunityWin, LevelTier } = db;
+const { User, Skill, Badge, UserBadge, Portfolio, Milestone, SalesRecord, Course, UserCourse, Notification, CommunityWin, LevelTier, Submission, ClassAttendance } = db;
 
 // ===== STUDENT MANAGEMENT =====
 
@@ -57,20 +57,71 @@ export const updateStudent = async (req: AuthRequest, res: Response): Promise<an
     const { studentId } = req.params;
     const { name, points, xpPoints, streak, membershipLevel, rank, city, membershipExpiresAt } = req.body;
     const student = await User.findByPk(studentId);
-    if (!student) return res.status(404).json({ message: 'Student not found' });
+    let updatedRank = rank !== undefined ? rank : student.rank;
+    if (membershipLevel !== undefined && rank === undefined) {
+      const upper = (membershipLevel || '').toUpperCase();
+      if (upper === 'GENERAL') updatedRank = 'General Member';
+      else if (upper === 'L0') updatedRank = 'Fast Start';
+      else if (upper === 'L1') updatedRank = 'Silver Member';
+      else if (upper === 'L2') updatedRank = 'Gold Member';
+      else if (upper === 'L3') updatedRank = 'Diamond Club';
+      else if (upper === 'L3+') updatedRank = 'Masters Club';
+    }
+
     await student.update({
       name: name !== undefined ? name : student.name,
       points: points !== undefined ? points : student.points,
       xpPoints: xpPoints !== undefined ? xpPoints : student.xpPoints,
       streak: streak !== undefined ? streak : student.streak,
       membershipLevel: membershipLevel !== undefined ? membershipLevel : student.membershipLevel,
-      rank: rank !== undefined ? rank : student.rank,
+      rank: updatedRank,
       city: city !== undefined ? city : student.city,
       membershipExpiresAt: membershipExpiresAt !== undefined ? (membershipExpiresAt ? new Date(membershipExpiresAt) : null) : student.membershipExpiresAt,
     });
     return res.status(200).json(student);
   } catch (error) {
     console.error('Error updating student:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// DELETE / soft-delete student from system
+export const deleteStudent = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { studentId } = req.params;
+    const student = await User.findByPk(studentId);
+    if (!student) return res.status(404).json({ message: 'Student not found' });
+
+    if (student.role === 'admin') {
+      return res.status(400).json({ message: 'Cannot delete an administrator account' });
+    }
+
+    const studentName = student.name;
+    const studentEmail = student.email;
+
+    // Clean up / soft-delete related artifacts
+    await Promise.allSettled([
+      Milestone.destroy({ where: { userId: studentId } }),
+      SalesRecord.destroy({ where: { userId: studentId } }),
+      Submission.destroy({ where: { studentId } }),
+      Notification.destroy({ where: { userId: studentId } }),
+      ClassAttendance.destroy({ where: { userId: studentId } }),
+      UserBadge.destroy({ where: { userId: studentId } }),
+      UserCourse.destroy({ where: { userId: studentId } }),
+      Portfolio.destroy({ where: { userId: studentId } }),
+      db.CommunityWin.destroy({ where: { studentName } }),
+      db.WebinarRegistration.destroy({ where: { email: studentEmail } }),
+    ]);
+
+    // Soft delete the user (paranoid mode sets deletedAt)
+    await student.destroy();
+
+    return res.status(200).json({
+      success: true,
+      message: `Student ${studentName} (${studentEmail}) has been successfully soft-deleted from the system.`,
+    });
+  } catch (error) {
+    console.error('Error soft-deleting student:', error);
     return res.status(500).json({ message: 'Internal server error' });
   }
 };

@@ -77,9 +77,20 @@ export const getStudentStats = async (req: AuthRequest, res: Response): Promise<
 
     if (!student) return res.status(404).json({ message: 'Student not found' });
 
-    let currentTier = levelTiers[0];
-    for (const tier of levelTiers) {
-      if ((student.points || 0) >= tier.minPoints) currentTier = tier;
+    const studentLevelRaw = (student.membershipLevel || 'GENERAL').toUpperCase();
+    let currentTier: any = null;
+    if (studentLevelRaw === 'GENERAL' || studentLevelRaw.includes('GENERAL')) {
+      currentTier = {
+        code: 'GENERAL',
+        name: 'General Member',
+        icon: '🌱',
+        badgeColor: 'slate',
+        order: -1,
+        description: 'Direct registered student with preview access',
+      };
+    } else {
+      const matchedTier = levelTiers.find((t: any) => t.code.toUpperCase() === studentLevelRaw);
+      currentTier = matchedTier || levelTiers[0];
     }
 
     const nextMilestone = student.milestones?.find((m: any) => !m.completed);
@@ -157,6 +168,15 @@ export const commentCommunityWin = async (req: AuthRequest, res: Response): Prom
     const { text } = req.body;
     const authorName = (req.user as any)?.name || 'Student';
     if (!text) return res.status(400).json({ message: 'Comment text is required' });
+
+    const student = await User.findByPk(req.user?.id);
+    const studentLevel = (student?.membershipLevel || 'GENERAL').toUpperCase();
+    if (studentLevel === 'GENERAL' || studentLevel === 'L0') {
+      return res.status(403).json({
+        message: 'General and Level 0 members have view-only access to the feed. Please upgrade to participate.'
+      });
+    }
+
     const win = await db.CommunityWin.findByPk(id);
     if (!win) return res.status(404).json({ message: 'Win not found' });
     win.comments = [...(win.comments || []), { author: authorName, text }];
@@ -174,6 +194,14 @@ export const postCommunityWin = async (req: AuthRequest, res: Response): Promise
     const studentId = req.user?.id;
     const studentName = (req.user as any)?.name || 'Student';
     if (!achievement && !title) return res.status(400).json({ message: 'Achievement text is required' });
+
+    const student = await User.findByPk(studentId);
+    const studentLevel = (student?.membershipLevel || 'GENERAL').toUpperCase();
+    if (studentLevel === 'GENERAL' || studentLevel === 'L0') {
+      return res.status(403).json({
+        message: 'General and Level 0 members have view-only access to the community feed. Please upgrade your membership to post.'
+      });
+    }
 
     let fullAchievement = achievement || title;
     if (salesAmount) fullAchievement += ` (₹${Number(salesAmount).toLocaleString()} sale!)`;

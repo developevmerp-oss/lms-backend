@@ -4,6 +4,7 @@ import {
   getAllStudents,
   getStudentById,
   updateStudent,
+  deleteStudent,
   addMilestone,
   updateMilestone,
   deleteMilestone,
@@ -58,6 +59,7 @@ router.delete('/offers/:id', deleteOffer);
 router.get('/students', getAllStudents);
 router.get('/students/:studentId', getStudentById);
 router.put('/students/:studentId', updateStudent);
+router.delete('/students/:studentId', deleteStudent);
 
 // Milestones
 router.post('/students/:studentId/milestones', addMilestone);

@@ -22,6 +22,7 @@ export interface UserAttributes {
   lastLoginAt?: Date | null;
   activeDaysHistory?: string[];
   membershipExpiresAt?: Date | null;
+  deletedAt?: Date | null;
 
   createdAt?: Date;
   updatedAt?: Date;
@@ -122,6 +123,8 @@ User.init(
     sequelize,
     modelName: 'User',
     tableName: 'Users',
+    paranoid: true,
+    timestamps: true,
   }
 );
 
