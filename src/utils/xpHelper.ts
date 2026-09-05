@@ -21,7 +21,7 @@ export const XP_TABLE = {
 export const isL3Student = (user: any): boolean => {
   if (!user) return false;
   const level = ((user.membershipLevel || user.rank || '') + '').toUpperCase();
-  return level.includes('L3') || level.includes('DIAMOND');
+  return level.includes('L3') || level.includes('DIAMOND') || level.includes('RENAISSANCE');
 };
 
 /**

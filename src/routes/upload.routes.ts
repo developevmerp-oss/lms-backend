@@ -5,17 +5,19 @@ import fs from 'fs';
 
 const router = Router();
 
-// Configure storage destination for videos
-const uploadsDir = path.join(__dirname, '../../uploads/videos');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+const getUploadsDir = () => {
+  const dir = path.join(process.cwd(), 'uploads/videos');
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return dir;
+};
 
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, uploadsDir);
+  destination: (_req: any, _file: any, cb: any) => {
+    cb(null, getUploadsDir());
   },
-  filename: (_req, file, cb) => {
+  filename: (_req: any, file: any, cb: any) => {
     const ext = path.extname(file.originalname) || '.mp4';
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
     cb(null, `video-${uniqueSuffix}${ext}`);
@@ -28,7 +30,7 @@ const upload = multer({
 });
 
 // Direct Multipart Video Upload Endpoint
-router.post('/video', upload.single('video'), (req, res) => {
+router.post('/video', upload.single('video'), (req: any, res: any) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No video file provided' });

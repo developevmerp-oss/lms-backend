@@ -8,7 +8,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey_change_in_produc
 
 export const register = async (req: Request, res: Response): Promise<any> => {
   try {
-    const { name, email, password, role, city, phone, bio } = req.body;
+    const { name, email, password, role, city, phone, bio, bundle, membershipLevel } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Name, email, and password are required' });
@@ -25,7 +25,11 @@ export const register = async (req: Request, res: Response): Promise<any> => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user with Fast Start (L0) initialized
+    // Direct registrations start as GENERAL unless bundle or L0 is explicitly requested
+    const isL0Requested = bundle === 'fast-start' || membershipLevel === 'L0';
+    const assignedLevel = isL0Requested ? 'L0' : 'GENERAL';
+    const assignedRank = isL0Requested ? 'Fast Start' : 'General Member';
+
     const user = await User.create({
       name: name.trim(),
       email: cleanEmail,
@@ -34,7 +38,8 @@ export const register = async (req: Request, res: Response): Promise<any> => {
       city: city || null,
       phone: phone || null,
       bio: bio || null,
-      rank: 'Fast Start',
+      membershipLevel: assignedLevel,
+      rank: assignedRank,
       points: 0,
       xpPoints: 0,
       streak: 1,
@@ -53,13 +58,16 @@ export const register = async (req: Request, res: Response): Promise<any> => {
     );
 
     res.status(201).json({
-      message: 'Account created and Fast Start (Level 0) enrolled successfully!',
+      message: isL0Requested
+        ? 'Account created and Fast Start (Level 0) enrolled successfully!'
+        : 'Account created successfully as General Member!',
       token,
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
+        membershipLevel: user.membershipLevel,
         rank: user.rank,
         points: user.points,
         city: user.city,
@@ -118,7 +126,7 @@ export const login = async (req: Request, res: Response): Promise<any> => {
         role: user.role,
         avatarUrl: user.avatarUrl,
         rank: user.rank,
-        membershipLevel: user.membershipLevel || 'L0',
+        membershipLevel: user.membershipLevel || 'GENERAL',
         points: user.points || 0,
         xpPoints: user.xpPoints || 0,
         lastLoginAt: user.lastLoginAt,
@@ -141,7 +149,16 @@ export const getMe = async (req: any, res: Response): Promise<any> => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    res.status(200).json({ user });
+    const userObj = user.toJSON ? user.toJSON() : (user as any);
+    const normalizedUser = {
+      ...userObj,
+      membershipLevel: userObj.membershipLevel || 'GENERAL',
+    };
+
+    res.status(200).json({
+      user: normalizedUser,
+      ...normalizedUser,
+    });
   } catch (error) {
     console.error('GetMe error:', error);
     res.status(500).json({ message: 'Internal server error' });

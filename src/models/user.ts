@@ -11,7 +11,7 @@ export interface UserAttributes {
   streak: number;
   
   // North Star Dash Additions
-  membershipLevel?: 'L0' | 'L1' | 'L2' | 'L3';
+  membershipLevel?: 'GENERAL' | 'L0' | 'L1' | 'L2' | 'L3' | string;
   rank?: string;
   xpPoints?: number;
   city?: string;
@@ -75,11 +75,11 @@ User.init(
     },
     membershipLevel: {
       type: DataTypes.STRING,
-      defaultValue: 'L0',
+      defaultValue: 'GENERAL',
     },
     rank: {
       type: DataTypes.STRING,
-      defaultValue: 'Beginner',
+      defaultValue: 'General Member',
     },
     xpPoints: {
       type: DataTypes.INTEGER,

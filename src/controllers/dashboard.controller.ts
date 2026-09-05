@@ -103,7 +103,7 @@ export const getStudentStats = async (req: AuthRequest, res: Response): Promise<
       xpPoints: student.xpPoints,
       streak: calculatedStreak,
       weekStatus,
-      membershipLevel: currentTier?.name || student.membershipLevel,
+      membershipLevel: student.membershipLevel || currentTier?.name || 'GENERAL',
       currentTier,
       levelTiers,
       rank: student.rank,

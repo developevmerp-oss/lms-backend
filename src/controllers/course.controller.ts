@@ -296,13 +296,19 @@ export const getCourses = async (req: Request, res: Response): Promise<any> => {
       });
     }
 
-    // Sanitize any large Base64 data URLs in videoUrl/pdfUrl to prevent 502 payload crashes
+    // Sanitize any large Base64 data URLs and normalize Windows backslashes in videoUrl/pdfUrl
     const sanitizedCourses = rawCourses.map((c: any) => {
       const courseJson = typeof c.toJSON === 'function' ? c.toJSON() : c;
       if (Array.isArray(courseJson.chapters)) {
         courseJson.chapters = courseJson.chapters.map((ch: any) => {
-          if (ch.videoUrl && ch.videoUrl.length > 500 && ch.videoUrl.startsWith('data:')) {
-            ch.videoUrl = ''; // Omit giant base64 payload from list view
+          if (ch.videoUrl) {
+            ch.videoUrl = ch.videoUrl.replace(/\\/g, '/');
+            if (ch.videoUrl.length > 500 && ch.videoUrl.startsWith('data:')) {
+              ch.videoUrl = ''; // Omit giant base64 payload from list view
+            }
+          }
+          if (ch.pdfUrl) {
+            ch.pdfUrl = ch.pdfUrl.replace(/\\/g, '/');
           }
           return ch;
         });
@@ -448,14 +454,22 @@ export const deleteCourse = async (req: Request, res: Response): Promise<any> =>
 export const addChapter = async (req: Request, res: Response): Promise<any> => {
   try {
     const { courseId } = req.params;
-    const { title, videoUrl, pdfUrl } = req.body;
+    let { title, videoUrl, pdfUrl } = req.body;
 
     const course = await Course.findByPk(courseId);
     if (!course) {
       return res.status(404).json({ message: 'Course not found' });
     }
 
-    const chapter = await Chapter.create({ title, videoUrl, pdfUrl, courseId });
+    const cleanVideoUrl = videoUrl ? videoUrl.replace(/\\/g, '/') : videoUrl;
+    const cleanPdfUrl = pdfUrl ? pdfUrl.replace(/\\/g, '/') : pdfUrl;
+
+    const chapter = await Chapter.create({
+      title,
+      videoUrl: cleanVideoUrl,
+      pdfUrl: cleanPdfUrl,
+      courseId,
+    });
     res.status(201).json({ message: 'Chapter added successfully', chapter });
   } catch (error: any) {
     console.error('Error adding chapter:', error);
@@ -467,12 +481,19 @@ export const addChapter = async (req: Request, res: Response): Promise<any> => {
 export const updateChapter = async (req: Request, res: Response): Promise<any> => {
   try {
     const { chapterId } = req.params;
-    const { title, videoUrl, pdfUrl } = req.body;
+    let { title, videoUrl, pdfUrl } = req.body;
 
     const chapter = await Chapter.findByPk(chapterId);
     if (!chapter) return res.status(404).json({ message: 'Chapter not found' });
 
-    await chapter.update({ title, videoUrl, pdfUrl });
+    const cleanVideoUrl = videoUrl !== undefined ? (videoUrl ? videoUrl.replace(/\\/g, '/') : '') : chapter.videoUrl;
+    const cleanPdfUrl = pdfUrl !== undefined ? (pdfUrl ? pdfUrl.replace(/\\/g, '/') : '') : chapter.pdfUrl;
+
+    await chapter.update({
+      title: title !== undefined ? title : chapter.title,
+      videoUrl: cleanVideoUrl,
+      pdfUrl: cleanPdfUrl,
+    });
     res.status(200).json({ message: 'Chapter updated successfully', chapter });
   } catch (error: any) {
     console.error('Error updating chapter:', error);
