@@ -39,8 +39,10 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
     `CREATE INDEX IF NOT EXISTS "idx_attendance_user" ON "ClassAttendances" ("userId");`,
     `CREATE INDEX IF NOT EXISTS "idx_liveclass_scheduled" ON "LiveClasses" ("scheduledAt");`,
 
-    // --- USERS TABLE SOFT DELETE ---
+    // --- USERS TABLE SOFT DELETE & PASSWORD RESET ---
     `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP WITH TIME ZONE;`,
+    `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "resetPasswordOtp" VARCHAR(10);`,
+    `ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "resetPasswordExpires" TIMESTAMP WITH TIME ZONE;`,
 
     // --- COURSES TABLE ---
     `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "levelCode" VARCHAR(255) DEFAULT 'L0';`,

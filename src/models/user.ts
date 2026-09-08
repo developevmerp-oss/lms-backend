@@ -22,6 +22,8 @@ export interface UserAttributes {
   lastLoginAt?: Date | null;
   activeDaysHistory?: string[];
   membershipExpiresAt?: Date | null;
+  resetPasswordOtp?: string | null;
+  resetPasswordExpires?: Date | null;
   deletedAt?: Date | null;
 
   createdAt?: Date;
@@ -115,6 +117,14 @@ User.init(
       defaultValue: [],
     },
     membershipExpiresAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    resetPasswordOtp: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    resetPasswordExpires: {
       type: DataTypes.DATE,
       allowNull: true,
     },

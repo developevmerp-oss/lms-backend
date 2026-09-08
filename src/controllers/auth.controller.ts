@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import db from '../models';
+import { sendPasswordResetOtpEmail } from '../services/email.service';
 
 const { User, Skill } = db;
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey_change_in_production';
@@ -203,3 +204,97 @@ export const updateProfile = async (req: any, res: Response): Promise<any> => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+export const forgotPassword = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: 'Email address is required' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ where: { email: cleanEmail } });
+
+    if (!user) {
+      return res.status(404).json({ message: 'No account found with this email address' });
+    }
+
+    // Generate cryptographically random 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    await user.update({
+      resetPasswordOtp: otp,
+      resetPasswordExpires: expires,
+    });
+
+    const emailResult = await sendPasswordResetOtpEmail({
+      to: user.email,
+      name: user.name,
+      otp,
+    });
+
+    return res.status(200).json({
+      message: 'Verification code sent successfully!',
+      devMode: emailResult.devMode,
+      previewOtp: emailResult.devMode ? otp : undefined,
+    });
+  } catch (error: any) {
+    console.error('Forgot password error:', error);
+    return res.status(500).json({ message: error.message || 'Internal server error' });
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ message: 'Email, verification code, and new password are required' });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ where: { email: cleanEmail } });
+
+    if (!user) {
+      return res.status(404).json({ message: 'Account not found' });
+    }
+
+    if (!user.resetPasswordOtp || !user.resetPasswordExpires) {
+      return res.status(400).json({ message: 'No active password reset request found. Please request a new code.' });
+    }
+
+    // Check expiry
+    if (new Date() > new Date(user.resetPasswordExpires)) {
+      await user.update({ resetPasswordOtp: null, resetPasswordExpires: null });
+      return res.status(400).json({ message: 'Verification code has expired. Please request a new code.' });
+    }
+
+    // Verify OTP
+    if (user.resetPasswordOtp.trim() !== String(otp).trim()) {
+      return res.status(400).json({ message: 'Invalid verification code. Please check and try again.' });
+    }
+
+    // Hash new password using bcrypt
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password and invalidate OTP
+    await user.update({
+      password: hashedPassword,
+      resetPasswordOtp: null,
+      resetPasswordExpires: null,
+    });
+
+    return res.status(200).json({
+      message: 'Password reset successfully! You can now log in with your new password.',
+    });
+  } catch (error: any) {
+    console.error('Reset password error:', error);
+    return res.status(500).json({ message: error.message || 'Internal server error' });
+  }
+};
+
