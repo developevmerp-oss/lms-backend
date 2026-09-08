@@ -195,6 +195,32 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
     `CREATE INDEX IF NOT EXISTS "idx_webinar_phone" ON "WebinarRegistrations" ("phone");`,
     `CREATE INDEX IF NOT EXISTS "idx_webinar_created" ON "WebinarRegistrations" ("createdAt" DESC);`,
     `CREATE INDEX IF NOT EXISTS "idx_webinar_event_scheduled" ON "WebinarEvents" ("scheduledAt");`,
+
+    // --- PAYMENT TRANSACTIONS TABLE ---
+    `CREATE TABLE IF NOT EXISTS "PaymentTransactions" (
+      "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "orderId" VARCHAR(255) UNIQUE NOT NULL,
+      "paymentId" VARCHAR(255),
+      "signature" VARCHAR(255),
+      "userId" UUID,
+      "customerName" VARCHAR(255),
+      "customerEmail" VARCHAR(255),
+      "customerPhone" VARCHAR(255),
+      "tierCode" VARCHAR(50) NOT NULL,
+      "tierName" VARCHAR(255) NOT NULL,
+      "amount" FLOAT NOT NULL DEFAULT 0,
+      "currency" VARCHAR(50) DEFAULT 'INR',
+      "status" VARCHAR(50) DEFAULT 'pending',
+      "failureReason" TEXT,
+      "paymentMethod" VARCHAR(100),
+      "paidAt" TIMESTAMP WITH TIME ZONE,
+      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );`,
+    `CREATE INDEX IF NOT EXISTS "idx_tx_order" ON "PaymentTransactions" ("orderId");`,
+    `CREATE INDEX IF NOT EXISTS "idx_tx_status" ON "PaymentTransactions" ("status");`,
+    `CREATE INDEX IF NOT EXISTS "idx_tx_email" ON "PaymentTransactions" ("customerEmail");`,
+    `CREATE INDEX IF NOT EXISTS "idx_tx_created" ON "PaymentTransactions" ("createdAt" DESC);`,
   ];
 
   try {

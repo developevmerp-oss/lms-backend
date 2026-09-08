@@ -24,6 +24,7 @@ import WebinarEvent from './webinarEvent';
 import LiveClass from './liveClass';
 import ClassAttendance from './classAttendance';
 import LevelOffer from './levelOffer';
+import PaymentTransaction from './paymentTransaction';
 
 const db: any = {};
 
@@ -54,6 +55,7 @@ db.WebinarEvent = WebinarEvent;
 db.LiveClass = LiveClass;
 db.ClassAttendance = ClassAttendance;
 db.LevelOffer = LevelOffer;
+db.PaymentTransaction = PaymentTransaction;
 
 // Setup manual associations
 User.hasOne(Skill, { foreignKey: 'userId', as: 'skills' });
@@ -73,6 +75,9 @@ Milestone.belongsTo(User, { foreignKey: 'userId' });
 
 User.hasMany(SalesRecord, { foreignKey: 'userId', as: 'salesRecords' });
 SalesRecord.belongsTo(User, { foreignKey: 'userId' });
+
+User.hasMany(PaymentTransaction, { foreignKey: 'userId', as: 'paymentTransactions' });
+PaymentTransaction.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
 User.hasMany(Notification, { foreignKey: 'userId', as: 'notifications' });
 Notification.belongsTo(User, { foreignKey: 'userId', as: 'user' });
