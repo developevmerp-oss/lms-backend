@@ -221,6 +221,14 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
     `CREATE INDEX IF NOT EXISTS "idx_tx_status" ON "PaymentTransactions" ("status");`,
     `CREATE INDEX IF NOT EXISTS "idx_tx_email" ON "PaymentTransactions" ("customerEmail");`,
     `CREATE INDEX IF NOT EXISTS "idx_tx_created" ON "PaymentTransactions" ("createdAt" DESC);`,
+
+    // --- SYSTEM SETTINGS (PERSISTENT CONFIG) TABLE ---
+    `CREATE TABLE IF NOT EXISTS "SystemSettings" (
+      "key" VARCHAR(255) PRIMARY KEY,
+      "value" TEXT,
+      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );`,
   ];
 
   try {

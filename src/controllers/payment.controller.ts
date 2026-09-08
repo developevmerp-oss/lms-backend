@@ -11,11 +11,42 @@ let dynamicRazorpayKeyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_1DP5mmOlF5G5
 let dynamicRazorpayKeySecret = process.env.RAZORPAY_KEY_SECRET || '';
 const JWT_SECRET = process.env.JWT_SECRET || 'your_secret_key';
 
+// Helper to resolve active Razorpay keys with DB persistence fallback
+const resolveRazorpayKeys = async () => {
+  // If valid non-dummy keys exist in env, use them
+  if (
+    process.env.RAZORPAY_KEY_ID &&
+    !process.env.RAZORPAY_KEY_ID.includes('1DP5mmOlF5G5ag') &&
+    process.env.RAZORPAY_KEY_SECRET
+  ) {
+    dynamicRazorpayKeyId = process.env.RAZORPAY_KEY_ID.trim();
+    dynamicRazorpayKeySecret = process.env.RAZORPAY_KEY_SECRET.trim();
+    return { keyId: dynamicRazorpayKeyId, keySecret: dynamicRazorpayKeySecret };
+  }
+
+  // Otherwise check persistent SystemSettings table in Postgres
+  try {
+    const [rows]: any = await db.sequelize.query(
+      `SELECT "key", "value" FROM "SystemSettings" WHERE "key" IN ('RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET');`
+    );
+    if (rows && rows.length > 0) {
+      const dbKeyId = rows.find((r: any) => r.key === 'RAZORPAY_KEY_ID')?.value;
+      const dbKeySecret = rows.find((r: any) => r.key === 'RAZORPAY_KEY_SECRET')?.value;
+      if (dbKeyId) dynamicRazorpayKeyId = dbKeyId.trim();
+      if (dbKeySecret) dynamicRazorpayKeySecret = dbKeySecret.trim();
+    }
+  } catch (_) {}
+
+  return { keyId: dynamicRazorpayKeyId, keySecret: dynamicRazorpayKeySecret };
+};
+
 // ── GET PUBLIC RAZORPAY KEY & STATUS ──
 export const getRazorpayKey = async (_req: Request, res: Response): Promise<any> => {
+  const { keyId, keySecret } = await resolveRazorpayKeys();
+  const isConfigured = !!(keyId && keySecret && !keyId.includes('1DP5mmOlF5G5ag'));
   return res.status(200).json({
-    keyId: dynamicRazorpayKeyId,
-    isConfigured: !!(dynamicRazorpayKeyId && dynamicRazorpayKeySecret && !dynamicRazorpayKeyId.includes('1DP5mmOlF5G5ag')),
+    keyId,
+    isConfigured,
   });
 };
 
@@ -26,9 +57,31 @@ export const updateRazorpayConfig = async (req: Request, res: Response): Promise
     if (keyId) dynamicRazorpayKeyId = keyId.trim();
     if (keySecret) dynamicRazorpayKeySecret = keySecret.trim();
 
+    // Persist to database so Render restarts never lose the keys
+    try {
+      if (keyId) {
+        await db.sequelize.query(
+          `INSERT INTO "SystemSettings" ("key", "value", "createdAt", "updatedAt")
+           VALUES ('RAZORPAY_KEY_ID', :val, NOW(), NOW())
+           ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED."value", "updatedAt" = NOW();`,
+          { replacements: { val: keyId.trim() } }
+        );
+      }
+      if (keySecret) {
+        await db.sequelize.query(
+          `INSERT INTO "SystemSettings" ("key", "value", "createdAt", "updatedAt")
+           VALUES ('RAZORPAY_KEY_SECRET', :val, NOW(), NOW())
+           ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED."value", "updatedAt" = NOW();`,
+          { replacements: { val: keySecret.trim() } }
+        );
+      }
+    } catch (dbErr: any) {
+      console.warn('Could not persist keys to SystemSettings table:', dbErr?.message);
+    }
+
     return res.status(200).json({
       success: true,
-      message: 'Razorpay keys updated successfully!',
+      message: 'Razorpay keys updated and saved permanently to database!',
       keyId: dynamicRazorpayKeyId,
     });
   } catch (error: any) {
@@ -57,10 +110,12 @@ export const createPaymentOrder = async (req: Request, res: Response): Promise<a
     const amountInPaise = Math.round(cleanAmount * 100);
     let orderId = `order_${tierCode.toLowerCase()}_${Date.now()}`;
 
+    const { keyId, keySecret } = await resolveRazorpayKeys();
+
     // If live/test Razorpay credentials exist, create order via Razorpay API
-    if (dynamicRazorpayKeyId && dynamicRazorpayKeySecret && !dynamicRazorpayKeyId.includes('1DP5mmOlF5G5ag')) {
+    if (keyId && keySecret && !keyId.includes('1DP5mmOlF5G5ag')) {
       try {
-        const authHeader = Buffer.from(`${dynamicRazorpayKeyId}:${dynamicRazorpayKeySecret}`).toString('base64');
+        const authHeader = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
         const response = await fetch('https://api.razorpay.com/v1/orders', {
           method: 'POST',
           headers: {
@@ -119,7 +174,7 @@ export const createPaymentOrder = async (req: Request, res: Response): Promise<a
       orderId,
       amount: amountInPaise,
       currency,
-      keyId: dynamicRazorpayKeyId,
+      keyId,
       tierCode,
       tierName,
     });
@@ -178,8 +233,10 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
       });
     }
 
+    const { keyId, keySecret } = await resolveRazorpayKeys();
+
     // 1. STRICT Cryptographic Signature Verification
-    if (dynamicRazorpayKeySecret && !dynamicRazorpayKeyId.includes('1DP5mmOlF5G5ag')) {
+    if (keySecret && !keyId.includes('1DP5mmOlF5G5ag')) {
       if (!razorpay_signature) {
         // Mark transaction as failed
         await PaymentTransaction.update(
@@ -193,7 +250,7 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
       }
 
       const generatedSignature = crypto
-        .createHmac('sha256', dynamicRazorpayKeySecret)
+        .createHmac('sha256', keySecret)
         .update(`${razorpay_order_id}|${razorpay_payment_id}`)
         .digest('hex');
 
