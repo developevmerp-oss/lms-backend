@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import db from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { isL3Student } from '../utils/xpHelper';
+import { canRedeemMerchStore } from '../utils/xpHelper';
 
 const { Reward, User } = db;
 
@@ -77,9 +77,9 @@ export const redeemReward = async (req: AuthRequest, res: Response): Promise<any
     const student = await User.findByPk(studentId);
     if (!student) return res.status(404).json({ message: 'Student not found' });
 
-    if (!isL3Student(student)) {
+    if (!canRedeemMerchStore(student)) {
       return res.status(403).json({
-        message: '🔒 XP Earning and Reward Store redemption is exclusively available for L3 Diamond Club Members!'
+        message: '🔒 Merch Store redemption is exclusively reserved for Level 3 (Diamond Club) members! You can continue earning XP across all modules, but upgrading to L3 is required to redeem items from the Merch Store.'
       });
     }
 

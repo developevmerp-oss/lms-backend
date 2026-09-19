@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import db from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { processStudentStreakAndWeekStatus } from '../utils/streakHelper';
+import { canEarnXp } from '../utils/xpHelper';
 
 const { User, Course, Submission, Skill, Badge, Portfolio, Milestone, SalesRecord, Notification } = db;
 
@@ -220,13 +221,10 @@ export const postCommunityWin = async (req: AuthRequest, res: Response): Promise
     if (studentId) {
       const student = await User.findByPk(studentId);
       if (student) {
-        // ONLY L3 (Diamond Club) students earn XP from Community Win posts
-        const isL3Student =
-          (student.membershipLevel || '').toUpperCase() === 'L3' ||
-          (student.rank || '').toUpperCase().includes('DIAMOND') ||
-          (student.membershipLevel || '').toUpperCase().includes('DIAMOND');
+        // L1 (Silver), L2 (Gold), and L3 (Diamond Club) students earn +100 XP from Community Win posts
+        const earnsXp = canEarnXp(student);
 
-        if (isL3Student) {
+        if (earnsXp) {
           student.points = (student.points || 0) + 100;
           student.xpPoints = (student.xpPoints || 0) + 100;
           await student.save();
@@ -243,7 +241,7 @@ export const postCommunityWin = async (req: AuthRequest, res: Response): Promise
       win,
       awardedXp,
       updatedPoints,
-      message: awardedXp > 0 ? `🎉 +${awardedXp} XP Awarded to Diamond (L3) Member!` : 'Post published to Community Feed successfully!'
+      message: awardedXp > 0 ? `🎉 +${awardedXp} XP Awarded for sharing your win!` : 'Post published to Community Feed successfully!'
     });
   } catch (error) {
     console.error('Error creating community win:', error);

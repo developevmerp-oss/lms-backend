@@ -14,23 +14,59 @@ export const XP_TABLE = {
   ARTISTRY_PINNACLE_AWARD: 2000,
 };
 
+
 /**
- * Strictly checks whether a student is in L3 (Diamond Club) tier.
- * ONLY L3 students earn XP across all modules.
+ * Checks whether a student can earn XP across LMS modules.
+ * L1 (Silver Member), L2 (Gold Member), and L3 (Diamond Club) can all earn XP.
  */
-export const isL3Student = (user: any): boolean => {
+export const canEarnXp = (user: any): boolean => {
   if (!user) return false;
   const level = ((user.membershipLevel || user.rank || '') + '').toUpperCase();
-  return level.includes('L3') || level.includes('DIAMOND') || level.includes('RENAISSANCE');
+  if (level === 'GENERAL' || level === 'L0' || level.includes('FAST START') || level.includes('FAST TRACK')) {
+    if (!level.includes('L1') && !level.includes('L2') && !level.includes('L3') && !level.includes('SILVER') && !level.includes('GOLD') && !level.includes('DIAMOND')) {
+      return false;
+    }
+  }
+  return (
+    level.includes('L1') ||
+    level.includes('SILVER') ||
+    level.includes('L2') ||
+    level.includes('GOLD') ||
+    level.includes('L3') ||
+    level.includes('DIAMOND') ||
+    level.includes('RENAISSANCE') ||
+    level.includes('MASTERS')
+  );
 };
 
 /**
- * Safely awards XP to a user IF AND ONLY IF they belong to L3 level.
- * Returns the amount of XP awarded (0 for non-L3 students).
+ * Strictly checks whether a student has permission to redeem items from the Merch Store.
+ * Merch Store redemption is strictly exclusive to Level 3 (Diamond Club / Masters Club).
+ * L1 and L2 members accumulate XP across all modules but CANNOT redeem from the Merch Store.
  */
-export const awardXpIfL3 = async (user: any, xpAmount: number): Promise<number> => {
+export const canRedeemMerchStore = (user: any): boolean => {
+  if (!user) return false;
+  const level = ((user.membershipLevel || user.rank || '') + '').toUpperCase();
+  return (
+    level.includes('L3') ||
+    level.includes('DIAMOND') ||
+    level.includes('RENAISSANCE') ||
+    level.includes('MASTERS')
+  );
+};
+
+/**
+ * Backward compatibility alias for canRedeemMerchStore.
+ */
+export const isL3Student = canRedeemMerchStore;
+
+/**
+ * Safely awards XP to a user IF they belong to an XP-eligible level (L1, L2, L3).
+ * Returns the amount of XP awarded (0 for non-eligible students).
+ */
+export const awardXp = async (user: any, xpAmount: number): Promise<number> => {
   if (!user) return 0;
-  if (!isL3Student(user)) return 0;
+  if (!canEarnXp(user)) return 0;
 
   user.points = (user.points || 0) + xpAmount;
   user.xpPoints = (user.xpPoints || 0) + xpAmount;
@@ -38,3 +74,6 @@ export const awardXpIfL3 = async (user: any, xpAmount: number): Promise<number> 
 
   return xpAmount;
 };
+
+export const awardXpIfL3 = awardXp;
+
