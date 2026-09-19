@@ -7,6 +7,7 @@ export interface PaymentTransactionAttributes {
   paymentId?: string | null;
   signature?: string | null;
   userId?: string | null;
+  courseId?: string | null;
   customerName?: string | null;
   customerEmail?: string | null;
   customerPhone?: string | null;
@@ -29,6 +30,7 @@ export interface PaymentTransactionCreationAttributes
     | 'paymentId'
     | 'signature'
     | 'userId'
+    | 'courseId'
     | 'customerName'
     | 'customerEmail'
     | 'customerPhone'
@@ -47,6 +49,7 @@ class PaymentTransaction
   public paymentId!: string | null;
   public signature!: string | null;
   public userId!: string | null;
+  public courseId!: string | null;
   public customerName!: string | null;
   public customerEmail!: string | null;
   public customerPhone!: string | null;
@@ -83,6 +86,10 @@ PaymentTransaction.init(
       allowNull: true,
     },
     userId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
+    courseId: {
       type: DataTypes.UUID,
       allowNull: true,
     },

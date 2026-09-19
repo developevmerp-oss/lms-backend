@@ -331,6 +331,7 @@ export const createCourse = async (req: Request, res: Response): Promise<any> =>
       description,
       image,
       levelCode,
+      price,
       order,
       discountType,
       discountValue,
@@ -340,15 +341,22 @@ export const createCourse = async (req: Request, res: Response): Promise<any> =>
     } = req.body;
 
     try {
-      await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "levelCode" VARCHAR(255) DEFAULT 'L0';`);
+      await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "levelCode" VARCHAR(255);`);
+      await sequelize.query(`ALTER TABLE "Courses" ALTER COLUMN "levelCode" DROP NOT NULL;`);
+      await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "price" VARCHAR(255);`);
       await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "order" INTEGER DEFAULT 0;`);
     } catch (_) {}
+
+    const isStandalone = !levelCode || levelCode === 'NONE' || String(levelCode).trim() === '';
+    const resolvedLevelCode = isStandalone ? null : String(levelCode).trim().toUpperCase();
+    const resolvedPrice = price !== undefined && price !== null && String(price).trim() !== '' ? String(price).trim() : null;
 
     const course = await Course.create({
       title,
       description,
       image,
-      levelCode: levelCode || 'L0',
+      levelCode: resolvedLevelCode,
+      price: resolvedPrice,
       order: parseInt(order) || 0,
       discountType: discountType || null,
       discountValue: discountValue !== undefined && discountValue !== null ? parseFloat(discountValue) : 0,
@@ -372,6 +380,7 @@ export const updateCourse = async (req: Request, res: Response): Promise<any> =>
       description,
       image,
       levelCode,
+      price,
       order,
       discountType,
       discountValue,
@@ -415,11 +424,26 @@ export const updateCourse = async (req: Request, res: Response): Promise<any> =>
       }
     }
 
+    let resolvedLevelCode = course.levelCode;
+    if (levelCode !== undefined) {
+      if (!levelCode || levelCode === 'NONE' || String(levelCode).trim() === '') {
+        resolvedLevelCode = null;
+      } else {
+        resolvedLevelCode = String(levelCode).trim().toUpperCase();
+      }
+    }
+
+    let resolvedPrice = course.price;
+    if (price !== undefined) {
+      resolvedPrice = price !== null && String(price).trim() !== '' ? String(price).trim() : null;
+    }
+
     await course.update({
       title: title !== undefined ? title : course.title,
       description: description !== undefined ? description : course.description,
       image: image !== undefined ? image : course.image,
-      levelCode: levelCode || course.levelCode,
+      levelCode: resolvedLevelCode,
+      price: resolvedPrice,
       order: parsedOrder,
       discountType: discountType !== undefined ? discountType : course.discountType,
       discountValue: parsedDiscountValue,

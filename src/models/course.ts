@@ -6,7 +6,8 @@ export interface CourseAttributes {
   title: string;
   description: string;
   image?: string;
-  levelCode?: string; // 'L0' | 'L1' | 'L2' | 'L3' | 'L3+'
+  levelCode?: string | null; // 'L0' | 'L1' | 'L2' | 'L3' | 'L3+' or null for standalone
+  price?: string | null; // e.g. "₹999" or "999" for individual courses
   order?: number;
   discountType?: 'percentage' | 'flat' | string | null;
   discountValue?: number | null;
@@ -24,7 +25,8 @@ interface Course extends CourseAttributes {
   title: string;
   description: string;
   image: string;
-  levelCode: string;
+  levelCode: string | null;
+  price: string | null;
   order: number;
   discountType: string | null;
   discountValue: number | null;
@@ -59,8 +61,13 @@ Course.init(
     },
     levelCode: {
       type: DataTypes.STRING,
-      allowNull: false,
-      defaultValue: 'L0',
+      allowNull: true,
+      defaultValue: null,
+    },
+    price: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      defaultValue: null,
     },
     order: {
       type: DataTypes.INTEGER,

@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 import { Op } from 'sequelize';
 import db from '../models';
 
-const { User, SalesRecord, Notification, CommunityWin, LevelTier, PaymentTransaction } = db;
+const { User, SalesRecord, Notification, CommunityWin, LevelTier, PaymentTransaction, Course, UserCourse } = db;
 
 let dynamicRazorpayKeyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_1DP5mmOlF5G5ag';
 let dynamicRazorpayKeySecret = process.env.RAZORPAY_KEY_SECRET || '';
@@ -97,6 +97,7 @@ export const createPaymentOrder = async (req: Request, res: Response): Promise<a
       currency = 'INR',
       tierCode = 'L0',
       tierName = 'Fast Track',
+      courseId,
       customerEmail,
       customerPhone,
       customerName,
@@ -106,9 +107,22 @@ export const createPaymentOrder = async (req: Request, res: Response): Promise<a
       return res.status(400).json({ message: 'Payment amount is required' });
     }
 
+    let resolvedTierCode = tierCode;
+    let resolvedTierName = tierName;
+
+    if (courseId) {
+      try {
+        const c = await Course.findByPk(courseId);
+        if (c) {
+          resolvedTierCode = 'COURSE';
+          resolvedTierName = c.title;
+        }
+      } catch (_) {}
+    }
+
     const cleanAmount = parseFloat(amount);
     const amountInPaise = Math.round(cleanAmount * 100);
-    let orderId = `order_${tierCode.toLowerCase()}_${Date.now()}`;
+    let orderId = `order_${resolvedTierCode.toLowerCase()}_${Date.now()}`;
 
     const { keyId, keySecret } = await resolveRazorpayKeys();
 
@@ -125,10 +139,11 @@ export const createPaymentOrder = async (req: Request, res: Response): Promise<a
           body: JSON.stringify({
             amount: amountInPaise,
             currency,
-            receipt: `rcpt_${tierCode.toLowerCase()}_${Date.now()}`,
+            receipt: `rcpt_${resolvedTierCode.toLowerCase()}_${Date.now()}`,
             notes: {
-              tierCode,
-              tierName,
+              tierCode: resolvedTierCode,
+              tierName: resolvedTierName,
+              courseId: courseId || '',
               customerEmail: customerEmail || '',
               customerName: customerName || '',
             },
@@ -155,8 +170,9 @@ export const createPaymentOrder = async (req: Request, res: Response): Promise<a
     try {
       await PaymentTransaction.create({
         orderId,
-        tierCode,
-        tierName,
+        tierCode: resolvedTierCode,
+        tierName: resolvedTierName,
+        courseId: courseId || null,
         amount: cleanAmount,
         currency,
         customerName: customerName || 'Art Student',
@@ -218,6 +234,7 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
       razorpay_signature,
       tierCode = 'L0',
       tierName = 'Fast Track',
+      courseId,
       amount = 499,
       email,
       name,
@@ -271,7 +288,7 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
     const cleanAmount = parseFloat(amount) || 499;
     const targetEmail = (email || '').trim().toLowerCase();
 
-    const [tx] = await PaymentTransaction.findOrCreate({
+    let [tx] = await PaymentTransaction.findOrCreate({
       where: { orderId: razorpay_order_id },
       defaults: {
         orderId: razorpay_order_id,
@@ -279,6 +296,7 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
         signature: razorpay_signature || null,
         tierCode,
         tierName,
+        courseId: courseId || null,
         amount: cleanAmount,
         currency: 'INR',
         customerEmail: targetEmail,
@@ -290,39 +308,59 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
       },
     });
 
+    const resolvedCourseId = courseId || tx?.courseId;
+    const isCoursePurchase = Boolean(resolvedCourseId || tierCode === 'COURSE');
+
+    let targetCourse: any = null;
+    if (resolvedCourseId) {
+      try {
+        targetCourse = await Course.findByPk(resolvedCourseId);
+      } catch (_) {}
+    }
+
+    const resolvedTierCode = isCoursePurchase ? 'COURSE' : tierCode;
+    const resolvedTierName = isCoursePurchase ? (targetCourse?.title || tierName) : tierName;
+
     if (tx) {
       await tx.update({
         status: 'completed',
         paymentId: razorpay_payment_id,
         signature: razorpay_signature || tx.signature,
         paymentMethod: paymentMethod || tx.paymentMethod,
+        tierCode: resolvedTierCode,
+        tierName: resolvedTierName,
+        courseId: resolvedCourseId || tx.courseId,
         paidAt: new Date(),
         failureReason: null,
       });
     }
 
-    // 3. User tier upgrade and validity logic
-    const fullTierLabel = `${tierName} (${tierCode})`;
+    // 3. User tier upgrade or Course enrollment logic
+    const fullTierLabel = `${resolvedTierName} (${resolvedTierCode})`;
 
     let membershipExpiresAt: Date | null = null;
-    try {
-      const matchedTier = await LevelTier.findOne({ where: { code: tierCode.trim().toUpperCase() } });
-      if (matchedTier && matchedTier.validityDays && Number(matchedTier.validityDays) > 0) {
-        membershipExpiresAt = new Date(Date.now() + Number(matchedTier.validityDays) * 24 * 60 * 60 * 1000);
-      }
-    } catch (_) {}
+    if (!isCoursePurchase) {
+      try {
+        const matchedTier = await LevelTier.findOne({ where: { code: tierCode.trim().toUpperCase() } });
+        if (matchedTier && matchedTier.validityDays && Number(matchedTier.validityDays) > 0) {
+          membershipExpiresAt = new Date(Date.now() + Number(matchedTier.validityDays) * 24 * 60 * 60 * 1000);
+        }
+      } catch (_) {}
+    }
 
     let user: any = null;
     if (targetEmail) {
       user = await User.findOne({ where: { email: targetEmail } });
 
       if (user) {
-        await user.update({
-          membershipLevel: fullTierLabel,
-          rank: fullTierLabel,
-          role: 'student',
-          membershipExpiresAt,
-        });
+        if (!isCoursePurchase) {
+          await user.update({
+            membershipLevel: fullTierLabel,
+            rank: fullTierLabel,
+            role: 'student',
+            membershipExpiresAt,
+          });
+        }
       } else {
         const defaultPwd = password || 'ArtStudent@2026';
         const hashedPassword = await bcrypt.hash(defaultPwd, 10);
@@ -333,8 +371,8 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
           password: hashedPassword,
           phone: phone || '',
           role: 'student',
-          membershipLevel: fullTierLabel,
-          rank: fullTierLabel,
+          membershipLevel: isCoursePurchase ? 'General Member' : fullTierLabel,
+          rank: isCoursePurchase ? 'General Member' : fullTierLabel,
           membershipExpiresAt,
           points: 100,
           streak: 1,
@@ -346,12 +384,36 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
       await tx.update({ userId: user.id });
     }
 
-    // 4. Log in SalesRecord & create Community Win
+    // 4. If this is an Individual Course Purchase, enroll student in UserCourse
+    if (user && resolvedCourseId) {
+      try {
+        const [uc, created] = await UserCourse.findOrCreate({
+          where: { userId: user.id, courseId: resolvedCourseId },
+          defaults: {
+            userId: user.id,
+            courseId: resolvedCourseId,
+            status: 'enrolled',
+            progress: 0,
+          },
+        });
+        if (!created) {
+          await uc.update({ status: 'enrolled' });
+        }
+      } catch (ucErr) {
+        console.error('Error enrolling student in UserCourse:', ucErr);
+      }
+    }
+
+    // 5. Log in SalesRecord & create Community Win
     if (user) {
+      const displayProductName = isCoursePurchase
+        ? `Masterclass: ${resolvedTierName}`
+        : `${resolvedTierName} Membership (${resolvedTierCode})`;
+
       try {
         await SalesRecord.create({
           userId: user.id,
-          productName: `${tierName} Membership (${tierCode})`,
+          productName: displayProductName,
           amount: cleanAmount,
           date: new Date(),
         });
@@ -361,9 +423,9 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
         await CommunityWin.create({
           userId: user.id,
           studentName: user.name,
-          title: `Unlocked ${tierName} (${tierCode})!`,
-          story: `${user.name} enrolled in ${tierName} to master resin art and commercial creations!`,
-          badge: `${tierCode} Member`,
+          title: isCoursePurchase ? `Unlocked Course: ${resolvedTierName}!` : `Unlocked ${resolvedTierName} (${resolvedTierCode})!`,
+          story: `${user.name} enrolled in ${resolvedTierName} to master resin art and commercial creations!`,
+          badge: isCoursePurchase ? 'Masterclass Enrolled' : `${resolvedTierCode} Member`,
           amount: `₹${cleanAmount.toLocaleString('en-IN')}`,
           avatarUrl: user.avatarUrl || '',
         });
@@ -372,8 +434,10 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
       try {
         await Notification.create({
           userId: user.id,
-          title: `🎉 ${tierName} Membership Unlocked!`,
-          message: `Welcome to ${tierName}! All video lessons and tools for ${tierCode} are now accessible in your Course Library.`,
+          title: `🎉 ${resolvedTierName} Unlocked!`,
+          message: isCoursePurchase
+            ? `You now have full access to ${resolvedTierName}! Enjoy your video lessons in the Course Library.`
+            : `Welcome to ${resolvedTierName}! All video lessons and tools for ${resolvedTierCode} are now accessible in your Course Library.`,
           type: 'milestone',
           read: false,
         });
@@ -391,9 +455,11 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
 
     return res.status(200).json({
       success: true,
-      message: `Payment verified! ${tierName} (${tierCode}) unlocked successfully.`,
-      tierCode,
-      tierName,
+      message: `Payment verified! ${resolvedTierName} unlocked successfully.`,
+      tierCode: resolvedTierCode,
+      tierName: resolvedTierName,
+      courseId: resolvedCourseId || null,
+      isCoursePurchase,
       paymentId: razorpay_payment_id,
       user: user
         ? {
