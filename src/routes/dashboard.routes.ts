@@ -14,9 +14,13 @@ import {
   deleteStudentSalesRecord,
   getPublicEventsList
 } from '../controllers/dashboard.controller';
+import { getActiveOffers } from '../controllers/offer.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 
 const router = Router();
+
+// Public / Student active level offers route
+router.get('/offers', getActiveOffers);
 
 // Public / Student levels route
 router.get('/levels', getPublicLevelTiers);
