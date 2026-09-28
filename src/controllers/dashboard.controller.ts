@@ -372,13 +372,26 @@ export const completeDailyRoutine = async (req: AuthRequest, res: Response): Pro
   }
 };
 
-// GET all community wins (Student / Authenticated users)
+// GET community wins (Student/Authenticated) — paginated
+// Query params: ?page=1&limit=20
 export const getCommunityWins = async (req: Request, res: Response): Promise<any> => {
   try {
-    const wins = await db.CommunityWin.findAll({
-      order: [['createdAt', 'DESC']]
+    const page = Math.max(1, parseInt(String(req.query.page || 1), 10));
+    const limit = Math.min(50, Math.max(1, parseInt(String(req.query.limit || 20), 10)));
+    const offset = (page - 1) * limit;
+
+    const { count, rows: wins } = await db.CommunityWin.findAndCountAll({
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset,
     });
-    return res.status(200).json(wins);
+
+    return res.status(200).json({
+      data: wins,
+      total: count,
+      page,
+      totalPages: Math.ceil(count / limit),
+    });
   } catch (error) {
     console.error('Error fetching community wins:', error);
     return res.status(500).json({ message: 'Internal server error' });

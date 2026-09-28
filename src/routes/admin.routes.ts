@@ -2,12 +2,14 @@ import { Router } from 'express';
 import { authenticate, requireAdmin } from '../middleware/auth.middleware';
 import {
   getAllStudents,
+  getStudentsSummary,
   getStudentById,
   updateStudent,
   deleteStudent,
   addMilestone,
   updateMilestone,
   deleteMilestone,
+  getAllMilestones,
   addSalesRecord,
   deleteSalesRecord,
   getAllBadges,
@@ -56,12 +58,14 @@ router.patch('/offers/:id/toggle', toggleOffer);
 router.delete('/offers/:id', deleteOffer);
 
 // Students
+router.get('/students/summary', getStudentsSummary);  // lean array — must be before /:studentId
 router.get('/students', getAllStudents);
 router.get('/students/:studentId', getStudentById);
 router.put('/students/:studentId', updateStudent);
 router.delete('/students/:studentId', deleteStudent);
 
 // Milestones
+router.get('/milestones', getAllMilestones);
 router.post('/students/:studentId/milestones', addMilestone);
 router.put('/milestones/:milestoneId', updateMilestone);
 router.delete('/milestones/:milestoneId', deleteMilestone);

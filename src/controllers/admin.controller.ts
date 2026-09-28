@@ -1,30 +1,84 @@
 import { Request, Response } from 'express';
+import { Op } from 'sequelize';
 import db from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { clearLevelTierCache } from './dashboard.controller';
 
 const { User, Skill, Badge, UserBadge, Portfolio, Milestone, SalesRecord, Course, UserCourse, Notification, CommunityWin, LevelTier, Submission, ClassAttendance } = db;
 
+// ── Pagination helper ──────────────────────────────────────────────────────
+// Parses ?page=1&limit=20 from query string and returns { page, limit, offset }
+const parsePagination = (query: any, defaultLimit = 20) => {
+  const page = Math.max(1, parseInt(String(query.page || 1), 10));
+  const limit = Math.min(100, Math.max(1, parseInt(String(query.limit || defaultLimit), 10)));
+  const offset = (page - 1) * limit;
+  return { page, limit, offset };
+};
+
 // ===== STUDENT MANAGEMENT =====
 
-// GET all students with full data
+// GET all students — paginated, searchable, and filterable
+// Query params: ?page=1&limit=20&search=name_or_email&level=L1
 export const getAllStudents = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { page, limit, offset } = parsePagination(req.query, 20);
+    const { search, level } = req.query;
+
+    const where: any = { role: 'student' };
+
+    // Search by name or email
+    if (search && String(search).trim()) {
+      const q = `%${String(search).trim()}%`;
+      where[Op.or] = [
+        { name: { [Op.iLike]: q } },
+        { email: { [Op.iLike]: q } },
+      ];
+    }
+
+    // Filter by membership level
+    if (level && String(level) !== 'all') {
+      where.membershipLevel = { [Op.iLike]: `%${String(level)}%` };
+    }
+
+    const { count, rows: students } = await User.findAndCountAll({
+      where,
+      attributes: [
+        'id', 'name', 'email', 'phone', 'city',
+        'points', 'xpPoints', 'streak',
+        'membershipLevel', 'rank',
+        'membershipExpiresAt', 'avatarUrl',
+        'lastLoginAt', 'createdAt'
+      ],
+      order: [['points', 'DESC']],
+      limit,
+      offset,
+    });
+
+    return res.status(200).json({
+      data: students,
+      total: count,
+      page,
+      totalPages: Math.ceil(count / limit),
+      limit,
+    });
+  } catch (error) {
+    console.error('Error fetching students:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// GET lean student list — plain array, no pagination, only essential fields
+// Used by dropdowns/selects in Dashboard, Badges, Certificates, Levels, Milestones
+export const getStudentsSummary = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const students = await User.findAll({
       where: { role: 'student' },
-      include: [
-        { model: Skill, as: 'skills' },
-        { model: Badge, as: 'badges' },
-        { model: Portfolio, as: 'portfolios' },
-        { model: Milestone, as: 'milestones', order: [['order', 'ASC']] },
-        { model: SalesRecord, as: 'salesRecords' },
-        { model: Course, as: 'courses' },
-      ],
-      order: [['points', 'DESC']]
+      attributes: ['id', 'name', 'email', 'membershipLevel', 'points', 'streak', 'lastLoginAt'],
+      order: [['name', 'ASC']],
     });
     return res.status(200).json(students);
   } catch (error) {
-    console.error('Error fetching students:', error);
+    console.error('Error fetching students summary:', error);
     return res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -164,6 +218,36 @@ export const deleteMilestone = async (req: AuthRequest, res: Response): Promise<
     return res.status(200).json({ message: 'Milestone deleted' });
   } catch (error) {
     console.error('Error deleting milestone:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// GET all milestones (flat list with student context) — used by admin milestones page
+export const getAllMilestones = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const milestones = await Milestone.findAll({
+      include: [{
+        model: User,
+        // no alias — Milestone.belongsTo(User) has no 'as' defined
+        attributes: ['id', 'name', 'email'],
+      }],
+      order: [['createdAt', 'DESC']],
+    });
+
+    // Flatten into shape the frontend expects: { ...milestone, studentName, studentId }
+    const flat = milestones.map((m: any) => {
+      const obj = typeof m.toJSON === 'function' ? m.toJSON() : m;
+      const userObj = obj.User || obj.user || {};
+      return {
+        ...obj,
+        studentName: userObj.name || 'Unknown',
+        studentId: userObj.id || obj.userId,
+      };
+    });
+
+    return res.status(200).json(flat);
+  } catch (error) {
+    console.error('Error fetching milestones:', error);
     return res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -399,14 +483,26 @@ export const sendNotification = async (req: AuthRequest, res: Response): Promise
   }
 };
 
-// GET all notifications (admin view)
+// GET all notifications (admin view) — paginated
+// Query params: ?page=1&limit=30
 export const getAllNotifications = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
-    const notifications = await Notification.findAll({
+    const { page, limit, offset } = parsePagination(req.query, 30);
+
+    const { count, rows: notifications } = await Notification.findAndCountAll({
       include: [{ model: User, as: 'user', attributes: ['id', 'name', 'email'] }],
-      order: [['createdAt', 'DESC']]
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset,
     });
-    return res.status(200).json(notifications);
+
+    return res.status(200).json({
+      data: notifications,
+      total: count,
+      page,
+      totalPages: Math.ceil(count / limit),
+      limit,
+    });
   } catch (error) {
     console.error('Error fetching notifications:', error);
     return res.status(500).json({ message: 'Internal server error' });
@@ -445,13 +541,25 @@ export const createCommunityWin = async (req: AuthRequest, res: Response): Promi
   }
 };
 
-// GET all community wins
+// GET all community wins — paginated
+// Query params: ?page=1&limit=20
 export const getAllCommunityWins = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
-    const wins = await CommunityWin.findAll({
-      order: [['createdAt', 'DESC']]
+    const { page, limit, offset } = parsePagination(req.query, 20);
+
+    const { count, rows: wins } = await CommunityWin.findAndCountAll({
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset,
     });
-    return res.status(200).json(wins);
+
+    return res.status(200).json({
+      data: wins,
+      total: count,
+      page,
+      totalPages: Math.ceil(count / limit),
+      limit,
+    });
   } catch (error) {
     console.error('Error fetching community wins:', error);
     return res.status(500).json({ message: 'Internal server error' });
@@ -636,8 +744,13 @@ export const deleteLevelTier = async (req: AuthRequest, res: Response): Promise<
 export const getRevenueByTier = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const tiers: any[] = await LevelTier.findAll({ order: [['order', 'ASC']] });
-    const students: any[] = await User.findAll({ where: { role: 'student' } });
-    const sales: any[] = await SalesRecord.findAll();
+    const students: any[] = await User.findAll({
+      where: { role: 'student' },
+      attributes: ['id', 'membershipLevel'],
+    });
+    const sales: any[] = await SalesRecord.findAll({
+      attributes: ['id', 'amount', 'userId'],
+    });
 
     const tierBreakdown = tiers.map((tier: any) => {
       const tierCode = (tier.code || '').toUpperCase();
@@ -690,17 +803,24 @@ export const broadcastNotification = async (req: AuthRequest, res: Response): Pr
 
     let targetUsers: any[] = [];
     if (targetAudience === 'all' || !targetAudience) {
-      targetUsers = await User.findAll({ where: { role: 'student' } });
+      targetUsers = await User.findAll({
+        where: { role: 'student' },
+        attributes: ['id'],
+      });
     } else if (['L0', 'L1', 'L2', 'L3'].includes(targetAudience)) {
       targetUsers = await User.findAll({
         where: {
           role: 'student',
           membershipLevel: targetAudience,
         },
+        attributes: ['id'],
       });
     } else if (targetAudience === 'webinar') {
       // Send to all students / webinar registrants
-      targetUsers = await User.findAll({ where: { role: 'student' } });
+      targetUsers = await User.findAll({
+        where: { role: 'student' },
+        attributes: ['id'],
+      });
     }
 
     if (targetUsers.length === 0) {

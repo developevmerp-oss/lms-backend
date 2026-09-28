@@ -8,7 +8,9 @@ export const getLeaderboard = async (req: Request, res: Response): Promise<any> 
     const students = await User.findAll({
       where: { role: 'student' },
       order: [['points', 'DESC'], ['streak', 'DESC']],
-      attributes: ['id', 'name', 'points', 'streak'] // don't expose email or password
+      // Only select fields needed for leaderboard display — never select all columns
+      attributes: ['id', 'name', 'points', 'xpPoints', 'streak', 'membershipLevel', 'rank', 'avatarUrl'],
+      limit: 100, // Cap at top 100 — prevents full table scan on every page load
     });
     res.status(200).json(students);
   } catch (error) {

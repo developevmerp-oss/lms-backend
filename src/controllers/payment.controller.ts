@@ -500,31 +500,63 @@ export const getPaymentHistory = async (req: Request, res: Response): Promise<an
       ];
     }
 
-    const transactions = await PaymentTransaction.findAll({
+    const { page, limit, offset } = (() => {
+      const p = Math.max(1, parseInt(String(req.query.page || 1), 10));
+      const l = Math.min(200, Math.max(1, parseInt(String(req.query.limit || 50), 10)));
+      return { page: p, limit: l, offset: (p - 1) * l };
+    })();
+
+    const { count, rows: transactions } = await PaymentTransaction.findAndCountAll({
       where: whereClause,
       order: [['createdAt', 'DESC']],
-      limit: 200,
+      limit,
+      offset,
     });
 
-    // Compute Summary Stats
-    const allTxs = await PaymentTransaction.findAll({ attributes: ['amount', 'status'] });
-    const totalRevenue = allTxs
-      .filter((t: any) => t.status === 'completed')
-      .reduce((sum: number, t: any) => sum + (Number(t.amount) || 0), 0);
+    // Compute Summary Stats using SQL aggregates — NOT by loading all rows into JS
+    const statsRows: any = await PaymentTransaction.findAll({
+      attributes: [
+        'status',
+        [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'count'],
+        [db.sequelize.fn('COALESCE', db.sequelize.fn('SUM', db.sequelize.col('amount')), 0), 'totalAmount'],
+      ],
+      group: ['status'],
+      raw: true,
+    });
 
-    const completedCount = allTxs.filter((t: any) => t.status === 'completed').length;
-    const pendingCount = allTxs.filter((t: any) => t.status === 'pending').length;
-    const failedCount = allTxs.filter((t: any) => t.status === 'failed' || t.status === 'cancelled').length;
+    let totalRevenue = 0;
+    let completedCount = 0;
+    let pendingCount = 0;
+    let failedCount = 0;
+    let totalAttempts = 0;
+
+    for (const row of (statsRows || [])) {
+      const c = parseInt(String(row.count || 0), 10);
+      const amt = parseFloat(String(row.totalAmount || 0));
+      totalAttempts += c;
+      if (row.status === 'completed') {
+        completedCount += c;
+        totalRevenue += amt;
+      } else if (row.status === 'pending') {
+        pendingCount += c;
+      } else if (row.status === 'failed' || row.status === 'cancelled') {
+        failedCount += c;
+      }
+    }
 
     return res.status(200).json({
       success: true,
       transactions,
+      total: count,
+      page,
+      totalPages: Math.ceil(count / limit),
+      limit,
       stats: {
         totalRevenue,
         completedCount,
         pendingCount,
         failedCount,
-        totalAttempts: allTxs.length,
+        totalAttempts,
       },
     });
   } catch (error: any) {

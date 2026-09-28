@@ -24,8 +24,11 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '500mb' }));
-app.use(express.urlencoded({ limit: '500mb', extended: true }));
+// NOTE: Limit was reduced from 500mb to 10mb to prevent large payloads from
+// burning Neon's monthly network transfer quota. For file uploads, use
+// multipart/form-data with multer (which streams to disk, not through JSON).
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 import path from 'path';
 import fs from 'fs';
