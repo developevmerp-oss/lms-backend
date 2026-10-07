@@ -4,7 +4,7 @@ import db from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { clearLevelTierCache } from './dashboard.controller';
 
-const { User, Skill, Badge, UserBadge, Portfolio, Milestone, SalesRecord, Course, UserCourse, Notification, CommunityWin, LevelTier, Submission, ClassAttendance } = db;
+const { User, Skill, Badge, UserBadge, Portfolio, Milestone, SalesRecord, Course, UserCourse, Notification, CommunityWin, LevelTier, Submission, ClassAttendance, WebinarRegistration } = db;
 
 // ── Pagination helper ──────────────────────────────────────────────────────
 // Parses ?page=1&limit=20 from query string and returns { page, limit, offset }
@@ -808,17 +808,77 @@ export const broadcastNotification = async (req: AuthRequest, res: Response): Pr
         attributes: ['id'],
       });
     } else if (['L0', 'L1', 'L2', 'L3'].includes(targetAudience)) {
+      if (targetAudience === 'L0') {
+        targetUsers = await User.findAll({
+          where: {
+            role: 'student',
+            [Op.or]: [
+              { membershipLevel: 'L0' },
+              { membershipLevel: { [Op.iLike]: '%L0%' } },
+            ],
+          },
+          attributes: ['id'],
+        });
+      } else {
+        targetUsers = await User.findAll({
+          where: {
+            role: 'student',
+            [Op.or]: [
+              { membershipLevel: targetAudience },
+              { membershipLevel: { [Op.iLike]: `%${targetAudience}%` } },
+            ],
+          },
+          attributes: ['id'],
+        });
+      }
+    } else if (targetAudience === 'general') {
+      // Students who have GENERAL, null, empty, or no L0, L1, L2, L3 level
       targetUsers = await User.findAll({
         where: {
           role: 'student',
-          membershipLevel: targetAudience,
+          [Op.or]: [
+            { membershipLevel: 'GENERAL' },
+            { membershipLevel: null },
+            { membershipLevel: '' },
+            { membershipLevel: { [Op.iLike]: '%general%' } },
+            {
+              [Op.and]: [
+                { membershipLevel: { [Op.notILike]: '%L0%' } },
+                { membershipLevel: { [Op.notILike]: '%L1%' } },
+                { membershipLevel: { [Op.notILike]: '%L2%' } },
+                { membershipLevel: { [Op.notILike]: '%L3%' } },
+              ],
+            },
+          ],
         },
         attributes: ['id'],
       });
     } else if (targetAudience === 'webinar') {
-      // Send to all students / webinar registrants
+      // Find students who registered for a webinar or have webinar-tagged level
+      const registrations: any[] = await WebinarRegistration.findAll({
+        attributes: ['email'],
+        raw: true,
+      });
+      const regEmails = Array.from(
+        new Set(
+          registrations
+            .map((r: any) => (r.email || '').toLowerCase().trim())
+            .filter(Boolean)
+        )
+      );
+
+      const orConditions: any[] = [
+        { membershipLevel: { [Op.iLike]: '%webinar%' } },
+      ];
+      if (regEmails.length > 0) {
+        orConditions.push({ email: { [Op.in]: regEmails } });
+      }
+
       targetUsers = await User.findAll({
-        where: { role: 'student' },
+        where: {
+          role: 'student',
+          [Op.or]: orConditions,
+        },
         attributes: ['id'],
       });
     }
