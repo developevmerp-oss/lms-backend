@@ -7,6 +7,10 @@ import {
   recordPaymentFailure,
   getPaymentHistory,
   deletePaymentTransaction,
+  getMyInstallmentPlans,
+  getAllStudentInstallmentPlans,
+  checkAndSendInstallmentReminders,
+  sendManualInstallmentReminder,
 } from '../controllers/payment.controller';
 import { authenticate, requireAdmin } from '../middleware/auth.middleware';
 
@@ -17,10 +21,15 @@ router.get('/key', getRazorpayKey);
 router.post('/create-order', createPaymentOrder);
 router.post('/record-failure', recordPaymentFailure);
 router.post('/verify', verifyPayment);
+router.get('/my-installments', authenticate, getMyInstallmentPlans);
 
 // Admin-only management & history endpoints
 router.post('/config', authenticate, requireAdmin, updateRazorpayConfig);
 router.get('/history', authenticate, requireAdmin, getPaymentHistory);
 router.delete('/transaction/:id', authenticate, requireAdmin, deletePaymentTransaction);
+router.get('/installments', authenticate, requireAdmin, getAllStudentInstallmentPlans);
+router.post('/installments/:planId/remind', authenticate, requireAdmin, sendManualInstallmentReminder);
+router.post('/installments/check-reminders', authenticate, requireAdmin, checkAndSendInstallmentReminders);
 
 export default router;
+

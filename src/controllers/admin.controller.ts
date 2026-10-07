@@ -632,6 +632,8 @@ export const createLevelTier = async (req: AuthRequest, res: Response): Promise<
       offerEndDate,
       offerActive,
       offerTitle,
+      installmentsEnabled,
+      installmentPlans,
     } = req.body;
 
     if (!code || !name) {
@@ -657,6 +659,8 @@ export const createLevelTier = async (req: AuthRequest, res: Response): Promise<
       offerEndDate: offerEndDate ? new Date(offerEndDate) : null,
       offerActive: Boolean(offerActive),
       offerTitle: offerTitle || 'Special Level Offer',
+      installmentsEnabled: installmentsEnabled !== undefined ? Boolean(installmentsEnabled) : false,
+      installmentPlans: Array.isArray(installmentPlans) ? installmentPlans : (installmentPlans || []),
     });
 
     clearLevelTierCache();
@@ -690,6 +694,8 @@ export const updateLevelTier = async (req: AuthRequest, res: Response): Promise<
       offerEndDate,
       offerActive,
       offerTitle,
+      installmentsEnabled,
+      installmentPlans,
     } = req.body;
 
     const tier = await LevelTier.findByPk(levelId);
@@ -714,6 +720,8 @@ export const updateLevelTier = async (req: AuthRequest, res: Response): Promise<
       offerEndDate: offerEndDate !== undefined ? (offerEndDate ? new Date(offerEndDate) : null) : tier.offerEndDate,
       offerActive: offerActive !== undefined ? Boolean(offerActive) : tier.offerActive,
       offerTitle: offerTitle !== undefined ? offerTitle : tier.offerTitle,
+      installmentsEnabled: installmentsEnabled !== undefined ? Boolean(installmentsEnabled) : tier.installmentsEnabled,
+      installmentPlans: installmentPlans !== undefined ? (Array.isArray(installmentPlans) ? installmentPlans : []) : tier.installmentPlans,
     });
 
     clearLevelTierCache();

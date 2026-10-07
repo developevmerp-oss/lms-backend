@@ -5,7 +5,34 @@ import jwt from 'jsonwebtoken';
 import { Op } from 'sequelize';
 import db from '../models';
 
-const { User, SalesRecord, Notification, CommunityWin, LevelTier, PaymentTransaction, Course, UserCourse } = db;
+const { User, SalesRecord, Notification, CommunityWin, LevelTier, PaymentTransaction, Course, UserCourse, StudentInstallmentPlan } = db;
+
+// Helper to compute next installment due date based on frequency
+export const computeNextDueDate = (frequency: string, fromDate = new Date()): Date => {
+  const d = new Date(fromDate);
+  switch (frequency) {
+    case 'weekly':
+      d.setDate(d.getDate() + 7);
+      break;
+    case 'biweekly':
+      d.setDate(d.getDate() + 14);
+      break;
+    case '2months':
+      d.setMonth(d.getMonth() + 2);
+      break;
+    case '3months':
+      d.setMonth(d.getMonth() + 3);
+      break;
+    case '6months':
+      d.setMonth(d.getMonth() + 6);
+      break;
+    case 'monthly':
+    default:
+      d.setMonth(d.getMonth() + 1);
+      break;
+  }
+  return d;
+};
 
 let dynamicRazorpayKeyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_1DP5mmOlF5G5ag';
 let dynamicRazorpayKeySecret = process.env.RAZORPAY_KEY_SECRET || '';
@@ -241,6 +268,14 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
       phone,
       password,
       paymentMethod = 'Online / Razorpay',
+      // Installment parameters
+      isInstallment,
+      planId,
+      planName,
+      planFrequency,
+      installmentAmount,
+      totalInstallments,
+      existingPlanId,
     } = req.body;
 
     if (!razorpay_payment_id || !razorpay_order_id) {
@@ -404,11 +439,75 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
       }
     }
 
+    // 4b. Installment Plan Handling (if paying via installment)
+    let studentInstallmentPlanRecord: any = null;
+    if (user && isInstallment) {
+      try {
+        if (existingPlanId) {
+          // Paying an ongoing installment for an existing plan
+          studentInstallmentPlanRecord = await StudentInstallmentPlan.findByPk(existingPlanId);
+          if (studentInstallmentPlanRecord) {
+            const nextPaidCount = (studentInstallmentPlanRecord.paidInstallments || 0) + 1;
+            const isCompleted = nextPaidCount >= studentInstallmentPlanRecord.totalInstallments;
+            const nextDueDate = isCompleted
+              ? null
+              : computeNextDueDate(studentInstallmentPlanRecord.frequency || 'monthly', new Date());
+
+            await studentInstallmentPlanRecord.update({
+              paidInstallments: nextPaidCount,
+              status: isCompleted ? 'completed' : 'active',
+              nextDueDate,
+              notes: `Paid installment ${nextPaidCount} of ${studentInstallmentPlanRecord.totalInstallments} on ${new Date().toISOString()}`,
+            });
+
+            if (isCompleted) {
+              await Notification.create({
+                userId: user.id,
+                title: '🎓 All Installments Completed!',
+                message: `Congratulations! You have completed all ${studentInstallmentPlanRecord.totalInstallments} installments for ${studentInstallmentPlanRecord.tierName || resolvedTierName}.`,
+                type: 'milestone',
+                link: '/student/dashboard',
+                isRead: false,
+              });
+            }
+          }
+        } else {
+          // Starting a brand new installment plan
+          const parsedTotal = parseInt(totalInstallments, 10) || 3;
+          const parsedInstAmount = parseFloat(installmentAmount) || cleanAmount;
+          const freq = planFrequency || 'monthly';
+          const nextDueDate = parsedTotal > 1 ? computeNextDueDate(freq, new Date()) : null;
+
+          studentInstallmentPlanRecord = await StudentInstallmentPlan.create({
+            userId: user.id,
+            tierCode: resolvedTierCode,
+            tierName: resolvedTierName,
+            planId: planId || 'plan_' + Date.now(),
+            planName: planName || `${resolvedTierName} Installment`,
+            frequency: freq,
+            installmentAmount: parsedInstAmount,
+            totalInstallments: parsedTotal,
+            paidInstallments: 1,
+            totalAmount: parsedInstAmount * parsedTotal,
+            nextDueDate,
+            status: parsedTotal <= 1 ? 'completed' : 'active',
+            notes: `Started installment plan on ${new Date().toISOString()}. Paid 1/${parsedTotal}.`,
+          });
+        }
+      } catch (instErr: any) {
+        console.error('Error handling student installment plan:', instErr);
+      }
+    }
+
     // 5. Log in SalesRecord & create Community Win
     if (user) {
-      const displayProductName = isCoursePurchase
+      let displayProductName = isCoursePurchase
         ? `Masterclass: ${resolvedTierName}`
         : `${resolvedTierName} Membership (${resolvedTierCode})`;
+
+      if (isInstallment && studentInstallmentPlanRecord) {
+        displayProductName = `${resolvedTierName} (Installment ${studentInstallmentPlanRecord.paidInstallments}/${studentInstallmentPlanRecord.totalInstallments})`;
+      }
 
       try {
         await SalesRecord.create({
@@ -432,12 +531,21 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
       } catch (_) {}
 
       try {
+        let notifMessage = isCoursePurchase
+          ? `You now have full access to ${resolvedTierName}! Enjoy your video lessons in the Course Library.`
+          : `Welcome to ${resolvedTierName}! All video lessons and tools for ${resolvedTierCode} are now accessible in your Course Library.`;
+
+        if (isInstallment && studentInstallmentPlanRecord) {
+          const dueDateStr = studentInstallmentPlanRecord.nextDueDate
+            ? new Date(studentInstallmentPlanRecord.nextDueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+            : 'N/A';
+          notifMessage = `Installment ${studentInstallmentPlanRecord.paidInstallments}/${studentInstallmentPlanRecord.totalInstallments} for ${resolvedTierName} paid! Next installment due on ${dueDateStr}.`;
+        }
+
         await Notification.create({
           userId: user.id,
           title: `🎉 ${resolvedTierName} Unlocked!`,
-          message: isCoursePurchase
-            ? `You now have full access to ${resolvedTierName}! Enjoy your video lessons in the Course Library.`
-            : `Welcome to ${resolvedTierName}! All video lessons and tools for ${resolvedTierCode} are now accessible in your Course Library.`,
+          message: notifMessage,
           type: 'milestone',
           read: false,
         });
@@ -460,6 +568,7 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
       tierName: resolvedTierName,
       courseId: resolvedCourseId || null,
       isCoursePurchase,
+      installmentPlan: studentInstallmentPlanRecord,
       paymentId: razorpay_payment_id,
       user: user
         ? {
@@ -573,5 +682,131 @@ export const deletePaymentTransaction = async (req: Request, res: Response): Pro
     return res.status(200).json({ success: true, message: 'Transaction record deleted' });
   } catch (error: any) {
     return res.status(500).json({ message: 'Failed to delete transaction', error: error?.message });
+  }
+};
+
+// ── GET CURRENT STUDENT'S ACTIVE INSTALLMENT PLANS ──
+export const getMyInstallmentPlans = async (req: any, res: Response): Promise<any> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ message: 'Authentication required' });
+
+    const plans = await StudentInstallmentPlan.findAll({
+      where: { userId },
+      order: [['createdAt', 'DESC']],
+    });
+
+    return res.status(200).json({ success: true, plans });
+  } catch (err: any) {
+    return res.status(500).json({ message: 'Failed to fetch installment plans', error: err?.message });
+  }
+};
+
+// ── GET ALL STUDENT INSTALLMENT PLANS (ADMIN) ──
+export const getAllStudentInstallmentPlans = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const plans = await StudentInstallmentPlan.findAll({
+      include: [{ model: User, as: 'user', attributes: ['id', 'name', 'email', 'phone', 'membershipLevel'] }],
+      order: [['nextDueDate', 'ASC'], ['createdAt', 'DESC']],
+    });
+    return res.status(200).json({ success: true, plans });
+  } catch (err: any) {
+    return res.status(500).json({ message: 'Failed to fetch installment plans', error: err?.message });
+  }
+};
+
+// ── CHECK AND SEND DUE-DATE INSTALLMENT REMINDERS (AUTO/SCHEDULED/ADMIN) ──
+export const checkAndSendInstallmentReminders = async (req?: Request, res?: Response): Promise<any> => {
+  try {
+    const threeDaysFromNow = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const plansToRemind = await StudentInstallmentPlan.findAll({
+      where: {
+        status: 'active',
+        nextDueDate: { [Op.lte]: threeDaysFromNow },
+        [Op.or]: [
+          { lastReminderSentAt: null },
+          { lastReminderSentAt: { [Op.lte]: oneDayAgo } },
+        ],
+      },
+      include: [{ model: User, as: 'user', attributes: ['id', 'name', 'email'] }],
+    });
+
+    let remindersSent = 0;
+    for (const plan of plansToRemind) {
+      const dueDateStr = plan.nextDueDate
+        ? new Date(plan.nextDueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+        : 'soon';
+      const isOverdue = plan.nextDueDate && new Date(plan.nextDueDate).getTime() < Date.now();
+
+      const title = isOverdue
+        ? '⚠️ Level 3 Installment Payment Overdue'
+        : '🔔 Level 3 Installment Due Reminder';
+      const message = isOverdue
+        ? `Your Level 3 installment #${plan.paidInstallments + 1} of ₹${plan.installmentAmount} was due on ${dueDateStr}. Please pay now to avoid access interruption.`
+        : `Reminder: Your Level 3 installment #${plan.paidInstallments + 1} of ₹${plan.installmentAmount} is due on ${dueDateStr}. Please complete your payment on time.`;
+
+      await Notification.create({
+        userId: plan.userId,
+        title,
+        message,
+        type: isOverdue ? 'alert' : 'info',
+        link: '/student/dashboard',
+        isRead: false,
+      });
+
+      await plan.update({
+        lastReminderSentAt: new Date(),
+        status: isOverdue ? 'overdue' : 'active',
+      });
+      remindersSent++;
+    }
+
+    if (res) {
+      return res.status(200).json({
+        success: true,
+        message: `Installment scan completed. Sent ${remindersSent} reminder notifications.`,
+        remindersSent,
+      });
+    }
+    return remindersSent;
+  } catch (err: any) {
+    console.error('Error checking installment reminders:', err);
+    if (res) return res.status(500).json({ message: 'Failed to process reminders', error: err?.message });
+  }
+};
+
+// ── MANUAL REMINDER TRIGGER FOR A SPECIFIC PLAN (ADMIN) ──
+export const sendManualInstallmentReminder = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { planId } = req.params;
+    const plan = await StudentInstallmentPlan.findByPk(planId, {
+      include: [{ model: User, as: 'user', attributes: ['id', 'name', 'email'] }],
+    });
+
+    if (!plan) return res.status(404).json({ message: 'Installment plan not found' });
+
+    const dueDateStr = plan.nextDueDate
+      ? new Date(plan.nextDueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+      : 'soon';
+
+    await Notification.create({
+      userId: plan.userId,
+      title: '🔔 Level 3 Installment Payment Reminder',
+      message: `Friendly reminder from Admin: Your Level 3 installment #${plan.paidInstallments + 1} of ₹${plan.installmentAmount} is scheduled for ${dueDateStr}.`,
+      type: 'info',
+      link: '/student/dashboard',
+      isRead: false,
+    });
+
+    await plan.update({ lastReminderSentAt: new Date() });
+
+    return res.status(200).json({
+      success: true,
+      message: `Reminder sent to ${(plan as any).user?.name || 'student'}!`,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ message: 'Failed to send manual reminder', error: err?.message });
   }
 };

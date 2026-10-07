@@ -21,6 +21,8 @@ export interface LevelTierAttributes {
   offerEndDate?: Date | string | null;
   offerActive?: boolean;
   offerTitle?: string | null;
+  installmentsEnabled?: boolean;
+  installmentPlans?: any; // array of dynamic installment plans configured by admin
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -47,6 +49,8 @@ class LevelTier extends Model<LevelTierAttributes, LevelTierCreationAttributes> 
   public offerEndDate?: Date | null;
   public offerActive?: boolean;
   public offerTitle?: string | null;
+  public installmentsEnabled?: boolean;
+  public installmentPlans?: any;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -141,6 +145,16 @@ LevelTier.init(
       type: DataTypes.STRING,
       allowNull: true,
       defaultValue: 'Special Festival Offer',
+    },
+    installmentsEnabled: {
+      type: DataTypes.BOOLEAN,
+      allowNull: true,
+      defaultValue: false,
+    },
+    installmentPlans: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: [],
     },
   },
   {

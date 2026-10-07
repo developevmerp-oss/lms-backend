@@ -93,6 +93,33 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
     `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "validityDays" INTEGER DEFAULT 0;`,
     `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "isPublished" BOOLEAN DEFAULT true;`,
     `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "offerTitle" VARCHAR(255) DEFAULT 'Special Festival Offer';`,
+    `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "installmentsEnabled" BOOLEAN DEFAULT false;`,
+    `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "installmentPlans" JSONB DEFAULT '[]'::jsonb;`,
+    `UPDATE "LevelTiers" SET "installmentsEnabled" = true WHERE ("levelCode" = 'L3' OR "code" = 'L3');`,
+
+    // --- STUDENT INSTALLMENT PLANS TABLE ---
+    `CREATE TABLE IF NOT EXISTS "StudentInstallmentPlans" (
+      "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      "userId" UUID NOT NULL REFERENCES "Users" ("id") ON DELETE CASCADE,
+      "tierCode" VARCHAR(50) NOT NULL DEFAULT 'L3',
+      "planId" VARCHAR(255),
+      "planName" VARCHAR(255) NOT NULL,
+      "frequency" VARCHAR(50) NOT NULL DEFAULT 'monthly',
+      "installmentAmount" FLOAT NOT NULL,
+      "totalAmount" FLOAT NOT NULL,
+      "totalInstallments" INTEGER NOT NULL DEFAULT 1,
+      "paidInstallments" INTEGER NOT NULL DEFAULT 1,
+      "lastPaidDate" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      "nextDueDate" TIMESTAMP WITH TIME ZONE,
+      "status" VARCHAR(50) NOT NULL DEFAULT 'active',
+      "lastReminderSentAt" TIMESTAMP WITH TIME ZONE,
+      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );`,
+    `CREATE INDEX IF NOT EXISTS "idx_installment_user" ON "StudentInstallmentPlans" ("userId");`,
+    `CREATE INDEX IF NOT EXISTS "idx_installment_status_due" ON "StudentInstallmentPlans" ("status", "nextDueDate");`,
+    `ALTER TABLE "StudentInstallmentPlans" ADD COLUMN IF NOT EXISTS "tierName" VARCHAR(255) DEFAULT 'Renaissance Certification';`,
+    `ALTER TABLE "StudentInstallmentPlans" ADD COLUMN IF NOT EXISTS "notes" TEXT;`,
 
     // --- LEVEL OFFERS TABLE (SEPARATE MODULE) ---
     `CREATE TABLE IF NOT EXISTS "LevelOffers" (
