@@ -84,6 +84,7 @@ export const getAdminTrackingSettings = async (_req: Request, res: Response): Pr
 
     return res.status(200).json({
       success: true,
+      data: settings,
       settings,
       meta: metaSetting,
     });
@@ -101,16 +102,18 @@ export const saveAdminTrackingSettings = async (req: Request, res: Response): Pr
       platform = 'META',
       pixelId,
       enabled = false,
-      trackPageView = true,
-      trackViewContent = true,
-      trackLead = true,
-      trackRegistration = true,
-      trackContact = true,
-      trackBooking = true,
-      trackCheckout = true,
-      trackPurchase = true,
       customData = {},
+      events = {},
     } = req.body;
+
+    const trackPageView = req.body.trackPageView !== undefined ? req.body.trackPageView : (events.pageView !== undefined ? events.pageView : true);
+    const trackViewContent = req.body.trackViewContent !== undefined ? req.body.trackViewContent : (events.viewContent !== undefined ? events.viewContent : true);
+    const trackLead = req.body.trackLead !== undefined ? req.body.trackLead : (events.lead !== undefined ? events.lead : true);
+    const trackRegistration = req.body.trackRegistration !== undefined ? req.body.trackRegistration : (events.registration !== undefined ? events.registration : true);
+    const trackContact = req.body.trackContact !== undefined ? req.body.trackContact : (events.contact !== undefined ? events.contact : true);
+    const trackBooking = req.body.trackBooking !== undefined ? req.body.trackBooking : (events.booking !== undefined ? events.booking : true);
+    const trackCheckout = req.body.trackCheckout !== undefined ? req.body.trackCheckout : (events.checkout !== undefined ? events.checkout : true);
+    const trackPurchase = req.body.trackPurchase !== undefined ? req.body.trackPurchase : (events.purchase !== undefined ? events.purchase : true);
 
     const trimmedPixelId = typeof pixelId === 'string' ? pixelId.trim() : '';
 
@@ -167,6 +170,7 @@ export const saveAdminTrackingSettings = async (req: Request, res: Response): Pr
     return res.status(200).json({
       success: true,
       message: `${platform} tracking configuration saved successfully.`,
+      data: setting,
       setting,
     });
   } catch (error: any) {
