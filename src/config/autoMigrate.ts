@@ -375,7 +375,7 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
     // ── 5. SEED DEFAULT MARKETING TRACKING SETTING (META) ──
     try {
       const [existingTracking] = await sequelize.query(`
-        SELECT id, "pixelId" FROM "marketing_tracking_settings" WHERE "platform" = 'META' LIMIT 1;
+        SELECT id FROM "marketing_tracking_settings" WHERE "platform" = 'META' LIMIT 1;
       `);
       if (!existingTracking || (Array.isArray(existingTracking) && existingTracking.length === 0)) {
         await sequelize.query(`
@@ -384,19 +384,12 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
             "trackLead", "trackRegistration", "trackContact", "trackBooking", "trackCheckout", "trackPurchase",
             "customData", "createdAt", "updatedAt"
           ) VALUES (
-            'meta-default-tracking-id', 'META', '1765233411475851', true, true, true,
+            'meta-default-tracking-id', 'META', '', false, true, true,
             true, true, true, true, true, true,
             '{}', NOW(), NOW()
           );
         `);
-        console.log('📊 Active Meta Pixel (1765233411475851) seeded');
-      } else {
-        // If row exists with empty pixelId, update with user's active Pixel ID
-        await sequelize.query(`
-          UPDATE "marketing_tracking_settings"
-          SET "pixelId" = '1765233411475851', "enabled" = true, "updatedAt" = NOW()
-          WHERE "platform" = 'META' AND ("pixelId" = '' OR "pixelId" IS NULL);
-        `);
+        console.log('📊 Default Meta Marketing Tracking configuration initialized (disabled by default)');
       }
     } catch (_) {}
 
