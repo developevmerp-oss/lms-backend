@@ -10,26 +10,42 @@ const { User, SalesRecord, Notification, CommunityWin, LevelTier, PaymentTransac
 // Helper to compute next installment due date based on frequency
 export const computeNextDueDate = (frequency: string, fromDate = new Date()): Date => {
   const d = new Date(fromDate);
-  switch (frequency) {
+  const freqLower = (frequency || 'monthly').toLowerCase().trim();
+  switch (freqLower) {
     case 'weekly':
       d.setDate(d.getDate() + 7);
       break;
     case 'biweekly':
       d.setDate(d.getDate() + 14);
       break;
+    case 'monthly':
+      d.setMonth(d.getMonth() + 1);
+      break;
     case '2months':
       d.setMonth(d.getMonth() + 2);
       break;
     case '3months':
+    case 'quarterly':
       d.setMonth(d.getMonth() + 3);
       break;
     case '6months':
+    case 'halfyearly':
       d.setMonth(d.getMonth() + 6);
       break;
-    case 'monthly':
-    default:
-      d.setMonth(d.getMonth() + 1);
+    default: {
+      const daysMatch = freqLower.match(/(\d+)\s*days?/);
+      if (daysMatch) {
+        d.setDate(d.getDate() + parseInt(daysMatch[1], 10));
+      } else {
+        const monthsMatch = freqLower.match(/(\d+)\s*months?/);
+        if (monthsMatch) {
+          d.setMonth(d.getMonth() + parseInt(monthsMatch[1], 10));
+        } else {
+          d.setMonth(d.getMonth() + 1);
+        }
+      }
       break;
+    }
   }
   return d;
 };
