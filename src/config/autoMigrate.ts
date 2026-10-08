@@ -260,6 +260,25 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
       "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
       "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     );`,
+
+    // --- MARKETING & CONVERSION TRACKING SETTINGS ---
+    `CREATE TABLE IF NOT EXISTS "marketing_tracking_settings" (
+      "id" VARCHAR(255) PRIMARY KEY,
+      "platform" VARCHAR(50) NOT NULL UNIQUE,
+      "pixelId" VARCHAR(255) DEFAULT '',
+      "enabled" BOOLEAN DEFAULT false,
+      "trackPageView" BOOLEAN DEFAULT true,
+      "trackViewContent" BOOLEAN DEFAULT true,
+      "trackLead" BOOLEAN DEFAULT true,
+      "trackRegistration" BOOLEAN DEFAULT true,
+      "trackContact" BOOLEAN DEFAULT true,
+      "trackBooking" BOOLEAN DEFAULT true,
+      "trackCheckout" BOOLEAN DEFAULT true,
+      "trackPurchase" BOOLEAN DEFAULT true,
+      "customData" JSONB DEFAULT '{}',
+      "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );`,
   ];
 
   try {
@@ -350,6 +369,27 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
           );
         `);
         console.log('🎟️ Default masterclass webinar event seeded');
+      }
+    } catch (_) {}
+
+    // ── 5. SEED DEFAULT MARKETING TRACKING SETTING (META) ──
+    try {
+      const [existingTracking] = await sequelize.query(`
+        SELECT id FROM "marketing_tracking_settings" WHERE "platform" = 'META' LIMIT 1;
+      `);
+      if (!existingTracking || (Array.isArray(existingTracking) && existingTracking.length === 0)) {
+        await sequelize.query(`
+          INSERT INTO "marketing_tracking_settings" (
+            "id", "platform", "pixelId", "enabled", "trackPageView", "trackViewContent",
+            "trackLead", "trackRegistration", "trackContact", "trackBooking", "trackCheckout", "trackPurchase",
+            "customData", "createdAt", "updatedAt"
+          ) VALUES (
+            'meta-default-tracking-id', 'META', '', false, true, true,
+            true, true, true, true, true, true,
+            '{}', NOW(), NOW()
+          );
+        `);
+        console.log('📊 Default Meta Marketing Tracking configuration seeded');
       }
     } catch (_) {}
 

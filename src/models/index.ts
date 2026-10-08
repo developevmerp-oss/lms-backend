@@ -26,6 +26,7 @@ import ClassAttendance from './classAttendance';
 import LevelOffer from './levelOffer';
 import PaymentTransaction from './paymentTransaction';
 import StudentInstallmentPlan from './studentInstallmentPlan';
+import MarketingTrackingSetting from './marketingTrackingSetting';
 
 const db: any = {};
 
@@ -58,6 +59,7 @@ db.ClassAttendance = ClassAttendance;
 db.LevelOffer = LevelOffer;
 db.PaymentTransaction = PaymentTransaction;
 db.StudentInstallmentPlan = StudentInstallmentPlan;
+db.MarketingTrackingSetting = MarketingTrackingSetting;
 
 // Setup manual associations
 User.hasOne(Skill, { foreignKey: 'userId', as: 'skills' });

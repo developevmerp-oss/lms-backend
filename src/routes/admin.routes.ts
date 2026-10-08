@@ -34,6 +34,12 @@ import {
   getRevenueByTier,
 } from '../controllers/admin.controller';
 import {
+  getAdminTrackingSettings,
+  saveAdminTrackingSettings,
+  updateAdminTrackingSettings,
+  toggleTrackingStatus,
+} from '../controllers/marketingTracking.controller';
+import {
   getAllOffers,
   createOffer,
   updateOffer,
@@ -104,6 +110,12 @@ router.post('/levels', createLevelTier);
 router.put('/levels/:levelId', updateLevelTier);
 router.delete('/levels/:levelId', deleteLevelTier);
 router.get('/revenue-by-tier', getRevenueByTier);
+
+// Marketing & Conversion Tracking Settings
+router.get('/marketing-tracking', getAdminTrackingSettings);
+router.post('/marketing-tracking', saveAdminTrackingSettings);
+router.put('/marketing-tracking/:id', updateAdminTrackingSettings);
+router.patch('/marketing-tracking/:id/status', toggleTrackingStatus);
 
 export default router;
 

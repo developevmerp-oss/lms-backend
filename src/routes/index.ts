@@ -13,6 +13,7 @@ import webinarRoutes from './webinar.routes';
 import paymentRoutes from './payment.routes';
 import classRoutes from './class.routes';
 import uploadRoutes from './upload.routes';
+import marketingTrackingRoutes from './marketingTracking.routes';
 
 const router = Router();
 
@@ -30,5 +31,6 @@ router.use('/webinar', webinarRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/classes', classRoutes);
 router.use('/upload', uploadRoutes);
+router.use('/marketing-tracking', marketingTrackingRoutes);
 
 export default router;
