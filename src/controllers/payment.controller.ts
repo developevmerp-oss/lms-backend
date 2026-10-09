@@ -490,14 +490,22 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
         } else {
           // Starting a brand new installment plan
           let parsedTotal = parseInt(totalInstallments, 10) || 3;
+          const freq = planFrequency || 'monthly';
           try {
             const matchedTier = await LevelTier.findOne({ where: { code: resolvedTierCode.trim().toUpperCase() } });
-            if (matchedTier && matchedTier.totalInstallments && Number(matchedTier.totalInstallments) >= 2) {
-              parsedTotal = Number(matchedTier.totalInstallments);
+            if (matchedTier) {
+              if (Array.isArray(matchedTier.installmentPlans) && freq) {
+                const planMatch = matchedTier.installmentPlans.find((p: any) => p && p.frequency === freq);
+                if (planMatch && planMatch.totalInstallments && Number(planMatch.totalInstallments) >= 2) {
+                  parsedTotal = Number(planMatch.totalInstallments);
+                }
+              }
+              if ((!parsedTotal || isNaN(parsedTotal)) && matchedTier.totalInstallments && Number(matchedTier.totalInstallments) >= 2) {
+                parsedTotal = Number(matchedTier.totalInstallments);
+              }
             }
           } catch (_) {}
           const parsedInstAmount = parseFloat(installmentAmount) || cleanAmount;
-          const freq = planFrequency || 'monthly';
           const nextDueDate = parsedTotal > 1 ? computeNextDueDate(freq, new Date()) : null;
 
           studentInstallmentPlanRecord = await StudentInstallmentPlan.create({
