@@ -94,8 +94,10 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
     `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "isPublished" BOOLEAN DEFAULT true;`,
     `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "offerTitle" VARCHAR(255) DEFAULT 'Special Festival Offer';`,
     `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "installmentsEnabled" BOOLEAN DEFAULT false;`,
+    `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "totalInstallments" INTEGER DEFAULT 3;`,
     `ALTER TABLE "LevelTiers" ADD COLUMN IF NOT EXISTS "installmentPlans" JSONB DEFAULT '[]'::jsonb;`,
     `UPDATE "LevelTiers" SET "installmentsEnabled" = true WHERE ("levelCode" = 'L3' OR "code" = 'L3') AND "installmentsEnabled" IS NULL;`,
+    `UPDATE "LevelTiers" SET "totalInstallments" = 3 WHERE "totalInstallments" IS NULL;`,
     `UPDATE "LevelTiers" SET "installmentPlans" = '[{"frequency":"biweekly","label":"Bi-Weekly","enabled":true},{"frequency":"monthly","label":"Monthly","enabled":true},{"frequency":"2months","label":"Every 2 Months","enabled":true},{"frequency":"3months","label":"Every 3 Months","enabled":true},{"frequency":"6months","label":"Every 6 Months","enabled":true}]'::jsonb WHERE ("levelCode" = 'L3' OR "code" = 'L3') AND ("installmentPlans" IS NULL OR "installmentPlans" = '[]'::jsonb);`,
 
     // --- STUDENT INSTALLMENT PLANS TABLE ---

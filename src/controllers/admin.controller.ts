@@ -633,6 +633,7 @@ export const createLevelTier = async (req: AuthRequest, res: Response): Promise<
       offerActive,
       offerTitle,
       installmentsEnabled,
+      totalInstallments,
       installmentPlans,
     } = req.body;
 
@@ -660,6 +661,7 @@ export const createLevelTier = async (req: AuthRequest, res: Response): Promise<
       offerActive: Boolean(offerActive),
       offerTitle: offerTitle || 'Special Level Offer',
       installmentsEnabled: installmentsEnabled !== undefined ? Boolean(installmentsEnabled) : false,
+      totalInstallments: totalInstallments !== undefined ? Math.max(2, Math.min(24, parseInt(String(totalInstallments), 10) || 3)) : 3,
       installmentPlans: Array.isArray(installmentPlans) ? installmentPlans : (installmentPlans || []),
     });
 
@@ -695,6 +697,7 @@ export const updateLevelTier = async (req: AuthRequest, res: Response): Promise<
       offerActive,
       offerTitle,
       installmentsEnabled,
+      totalInstallments,
       installmentPlans,
     } = req.body;
 
@@ -721,6 +724,7 @@ export const updateLevelTier = async (req: AuthRequest, res: Response): Promise<
       offerActive: offerActive !== undefined ? Boolean(offerActive) : tier.offerActive,
       offerTitle: offerTitle !== undefined ? offerTitle : tier.offerTitle,
       installmentsEnabled: installmentsEnabled !== undefined ? Boolean(installmentsEnabled) : tier.installmentsEnabled,
+      totalInstallments: totalInstallments !== undefined ? Math.max(2, Math.min(24, parseInt(String(totalInstallments), 10) || 3)) : (tier.totalInstallments || 3),
       installmentPlans: installmentPlans !== undefined ? (Array.isArray(installmentPlans) ? installmentPlans : []) : tier.installmentPlans,
     });
 

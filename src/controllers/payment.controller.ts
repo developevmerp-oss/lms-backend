@@ -489,7 +489,13 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
           }
         } else {
           // Starting a brand new installment plan
-          const parsedTotal = parseInt(totalInstallments, 10) || 3;
+          let parsedTotal = parseInt(totalInstallments, 10) || 3;
+          try {
+            const matchedTier = await LevelTier.findOne({ where: { code: resolvedTierCode.trim().toUpperCase() } });
+            if (matchedTier && matchedTier.totalInstallments && Number(matchedTier.totalInstallments) >= 2) {
+              parsedTotal = Number(matchedTier.totalInstallments);
+            }
+          } catch (_) {}
           const parsedInstAmount = parseFloat(installmentAmount) || cleanAmount;
           const freq = planFrequency || 'monthly';
           const nextDueDate = parsedTotal > 1 ? computeNextDueDate(freq, new Date()) : null;

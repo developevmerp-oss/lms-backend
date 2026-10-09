@@ -22,6 +22,7 @@ export interface LevelTierAttributes {
   offerActive?: boolean;
   offerTitle?: string | null;
   installmentsEnabled?: boolean;
+  totalInstallments?: number;
   installmentPlans?: any; // array of dynamic installment plans configured by admin
   createdAt?: Date;
   updatedAt?: Date;
@@ -50,6 +51,7 @@ class LevelTier extends Model<LevelTierAttributes, LevelTierCreationAttributes> 
   public offerActive?: boolean;
   public offerTitle?: string | null;
   public installmentsEnabled?: boolean;
+  public totalInstallments?: number;
   public installmentPlans?: any;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -150,6 +152,11 @@ LevelTier.init(
       type: DataTypes.BOOLEAN,
       allowNull: true,
       defaultValue: false,
+    },
+    totalInstallments: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 3,
     },
     installmentPlans: {
       type: DataTypes.JSONB,
