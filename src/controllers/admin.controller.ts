@@ -468,15 +468,39 @@ export const updateStudentSkills = async (req: AuthRequest, res: Response): Prom
 export const enrollStudentInCourse = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const { studentId } = req.params;
-    const { courseId, progress, status } = req.body;
+    const { courseId, progress, status, expiresAt: customExpiresAt } = req.body;
+
+    const targetCourse = await Course.findByPk(courseId);
+    const enrolledAt = new Date();
+    let calculatedExpiresAt: Date | null = null;
+
+    if (customExpiresAt) {
+      calculatedExpiresAt = new Date(customExpiresAt);
+    } else if (targetCourse?.validityMonths && Number(targetCourse.validityMonths) > 0) {
+      const exp = new Date(enrolledAt);
+      exp.setMonth(exp.getMonth() + Number(targetCourse.validityMonths));
+      calculatedExpiresAt = exp;
+    }
     
     const [record, created] = await UserCourse.findOrCreate({
       where: { userId: studentId, courseId },
-      defaults: { progress: progress || 0, status: status || 'enrolled' }
+      defaults: {
+        progress: progress || 0,
+        status: status || 'enrolled',
+        enrolledAt,
+        expiresAt: calculatedExpiresAt,
+        validityMonths: targetCourse?.validityMonths || null,
+      }
     });
     
     if (!created) {
-      await record.update({ progress, status });
+      await record.update({
+        progress: progress !== undefined ? progress : record.progress,
+        status: status || 'enrolled',
+        enrolledAt,
+        expiresAt: calculatedExpiresAt !== undefined ? calculatedExpiresAt : record.expiresAt,
+        validityMonths: targetCourse?.validityMonths || record.validityMonths,
+      });
     }
     return res.status(200).json(record);
   } catch (error) {

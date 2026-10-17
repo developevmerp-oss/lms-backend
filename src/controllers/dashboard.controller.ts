@@ -67,7 +67,14 @@ export const getStudentStats = async (req: AuthRequest, res: Response): Promise<
           { model: Portfolio, as: 'portfolios', attributes: ['id', 'title', 'technique', 'imageUrl', 'feedback', 'createdAt'] },
           { model: Milestone, as: 'milestones', attributes: ['id', 'name', 'completed', 'completedAt', 'order'] },
           { model: SalesRecord, as: 'salesRecords', attributes: ['id', 'amount', 'productName', 'date'] },
-          { model: Course, as: 'courses', attributes: ['id', 'title', 'description', 'levelCode', 'image', 'price'] },
+          {
+            model: Course,
+            as: 'courses',
+            attributes: ['id', 'title', 'description', 'levelCode', 'image', 'price', 'validityMonths', 'validityStartDate', 'validityEndDate'],
+            through: {
+              attributes: ['id', 'status', 'progress', 'enrolledAt', 'expiresAt', 'validityMonths'],
+            },
+          },
           { model: Notification, as: 'notifications', attributes: ['id', 'title', 'message', 'type', 'link', 'isRead', 'createdAt'] },
         ]
       }),

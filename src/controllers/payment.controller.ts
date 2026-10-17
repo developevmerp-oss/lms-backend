@@ -165,7 +165,7 @@ export const createPaymentOrder = async (req: Request, res: Response): Promise<a
 
         // Validity check strictly for individual/standalone course
         const isStandalone = !c.levelCode || c.levelCode === 'NONE' || String(c.levelCode).trim() === '';
-        if (isStandalone) {
+        if (isStandalone && !c.validityMonths) {
           const now = new Date();
           if (c.validityStartDate && new Date(c.validityStartDate) > now) {
             const startStr = new Date(c.validityStartDate).toLocaleDateString('en-IN', {
@@ -399,7 +399,7 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
 
     if (targetCourse) {
       const isStandaloneCourse = !targetCourse.levelCode || targetCourse.levelCode === 'NONE' || String(targetCourse.levelCode).trim() === '';
-      if (isStandaloneCourse) {
+      if (isStandaloneCourse && !targetCourse.validityMonths) {
         const now = new Date();
         if (targetCourse.validityStartDate && new Date(targetCourse.validityStartDate) > now) {
           return res.status(400).json({
@@ -483,8 +483,17 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
     // 4. Enroll student in UserCourse (Individual Course OR Level Tier Bundle)
     if (user) {
       if (resolvedCourseId) {
-        // Individual Course Purchase
+        // Individual Course Purchase: Rolling validity from purchase date (1 to 6 months or lifetime)
         try {
+          const enrolledAt = new Date();
+          let expiresAt: Date | null = null;
+          const validityMonths = targetCourse?.validityMonths ? Number(targetCourse.validityMonths) : null;
+          if (validityMonths && validityMonths > 0) {
+            const exp = new Date(enrolledAt);
+            exp.setMonth(exp.getMonth() + validityMonths);
+            expiresAt = exp;
+          }
+
           const [uc, created] = await UserCourse.findOrCreate({
             where: { userId: user.id, courseId: resolvedCourseId },
             defaults: {
@@ -492,10 +501,19 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
               courseId: resolvedCourseId,
               status: 'enrolled',
               progress: 0,
+              enrolledAt,
+              expiresAt,
+              validityMonths,
             },
           });
           if (!created) {
-            await uc.update({ status: 'enrolled' });
+            // Re-purchase or renewal: refreshes validity from new purchase date
+            await uc.update({
+              status: 'enrolled',
+              enrolledAt,
+              expiresAt,
+              validityMonths,
+            });
           }
         } catch (ucErr) {
           console.error('Error enrolling student in UserCourse:', ucErr);

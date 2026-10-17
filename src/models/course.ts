@@ -16,6 +16,7 @@ export interface CourseAttributes {
   offerActive?: boolean;
   validityStartDate?: Date | string | null;
   validityEndDate?: Date | string | null;
+  validityMonths?: number | null; // Course validity duration in months: 1 to 6, or null for lifetime
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -37,6 +38,7 @@ interface Course extends CourseAttributes {
   offerActive: boolean;
   validityStartDate: Date | null;
   validityEndDate: Date | null;
+  validityMonths: number | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
@@ -107,6 +109,11 @@ Course.init(
     validityEndDate: {
       type: DataTypes.DATE,
       allowNull: true,
+    },
+    validityMonths: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: null,
     },
   },
   {
