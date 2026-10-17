@@ -78,7 +78,7 @@ export const getStudentStats = async (req: AuthRequest, res: Response): Promise<
           { model: Notification, as: 'notifications', attributes: ['id', 'title', 'message', 'type', 'link', 'isRead', 'createdAt'] },
         ]
       }),
-      Course.findAll({ attributes: ['id', 'title', 'description', 'image'] }),
+      Course.findAll({ attributes: ['id', 'title', 'description', 'image', 'flyerImage'] }),
       db.CommunityWin.findAll({ order: [['createdAt', 'DESC']], limit: 5 }),
       getLevelTiers(),
     ]);

@@ -348,6 +348,7 @@ export const createCourse = async (req: Request, res: Response): Promise<any> =>
       title,
       description,
       image,
+      flyerImage,
       levelCode,
       price,
       order,
@@ -366,6 +367,7 @@ export const createCourse = async (req: Request, res: Response): Promise<any> =>
       await sequelize.query(`ALTER TABLE "Courses" ALTER COLUMN "levelCode" DROP NOT NULL;`);
       await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "price" VARCHAR(255);`);
       await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "order" INTEGER DEFAULT 0;`);
+      await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "flyerImage" TEXT;`);
       await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "validityStartDate" TIMESTAMP WITH TIME ZONE;`);
       await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "validityEndDate" TIMESTAMP WITH TIME ZONE;`);
       await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "validityMonths" INTEGER;`);
@@ -380,6 +382,7 @@ export const createCourse = async (req: Request, res: Response): Promise<any> =>
       title,
       description,
       image,
+      flyerImage: flyerImage || null,
       levelCode: resolvedLevelCode,
       price: resolvedPrice,
       order: parseInt(order) || 0,
@@ -407,6 +410,7 @@ export const updateCourse = async (req: Request, res: Response): Promise<any> =>
       title,
       description,
       image,
+      flyerImage,
       levelCode,
       price,
       order,
@@ -512,6 +516,7 @@ export const updateCourse = async (req: Request, res: Response): Promise<any> =>
       title: title !== undefined ? title : course.title,
       description: description !== undefined ? description : course.description,
       image: image !== undefined ? image : course.image,
+      flyerImage: flyerImage !== undefined ? flyerImage : course.flyerImage,
       levelCode: resolvedLevelCode,
       price: resolvedPrice,
       order: parsedOrder,

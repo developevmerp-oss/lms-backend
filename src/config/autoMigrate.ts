@@ -48,6 +48,7 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
     `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "levelCode" VARCHAR(255) DEFAULT 'L0';`,
     `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "order" INTEGER DEFAULT 0;`,
     `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "image" TEXT;`,
+    `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "flyerImage" TEXT;`,
     `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "discountType" VARCHAR(50);`,
     `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "discountValue" FLOAT DEFAULT 0;`,
     `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "offerStartDate" TIMESTAMP WITH TIME ZONE;`,

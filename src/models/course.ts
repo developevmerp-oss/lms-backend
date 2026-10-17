@@ -6,6 +6,7 @@ export interface CourseAttributes {
   title: string;
   description: string;
   image?: string;
+  flyerImage?: string | null;
   levelCode?: string | null; // 'L0' | 'L1' | 'L2' | 'L3' | 'L3+' or null for standalone
   price?: string | null; // e.g. "₹999" or "999" for individual courses
   order?: number;
@@ -28,6 +29,7 @@ interface Course extends CourseAttributes {
   title: string;
   description: string;
   image: string;
+  flyerImage?: string | null;
   levelCode: string | null;
   price: string | null;
   order: number;
@@ -64,6 +66,11 @@ Course.init(
     image: {
       type: DataTypes.TEXT,
       allowNull: true,
+    },
+    flyerImage: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      defaultValue: null,
     },
     levelCode: {
       type: DataTypes.STRING,
