@@ -480,23 +480,62 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
       await tx.update({ userId: user.id });
     }
 
-    // 4. If this is an Individual Course Purchase, enroll student in UserCourse
-    if (user && resolvedCourseId) {
-      try {
-        const [uc, created] = await UserCourse.findOrCreate({
-          where: { userId: user.id, courseId: resolvedCourseId },
-          defaults: {
-            userId: user.id,
-            courseId: resolvedCourseId,
-            status: 'enrolled',
-            progress: 0,
-          },
-        });
-        if (!created) {
-          await uc.update({ status: 'enrolled' });
+    // 4. Enroll student in UserCourse (Individual Course OR Level Tier Bundle)
+    if (user) {
+      if (resolvedCourseId) {
+        // Individual Course Purchase
+        try {
+          const [uc, created] = await UserCourse.findOrCreate({
+            where: { userId: user.id, courseId: resolvedCourseId },
+            defaults: {
+              userId: user.id,
+              courseId: resolvedCourseId,
+              status: 'enrolled',
+              progress: 0,
+            },
+          });
+          if (!created) {
+            await uc.update({ status: 'enrolled' });
+          }
+        } catch (ucErr) {
+          console.error('Error enrolling student in UserCourse:', ucErr);
         }
-      } catch (ucErr) {
-        console.error('Error enrolling student in UserCourse:', ucErr);
+      } else if (!isCoursePurchase && tierCode) {
+        // Level Tier Purchase (L0, L1, L2, L3, L3+): Auto-enroll in all courses of this tier & lower tiers
+        try {
+          const cleanTier = tierCode.trim().toUpperCase();
+          const tierHierarchy: Record<string, string[]> = {
+            L0: ['L0'],
+            L1: ['L0', 'L1'],
+            L2: ['L0', 'L1', 'L2'],
+            L3: ['L0', 'L1', 'L2', 'L3'],
+            'L3+': ['L0', 'L1', 'L2', 'L3', 'L3+'],
+          };
+          const accessibleTiers = tierHierarchy[cleanTier] || [cleanTier];
+          const tierCourses = await Course.findAll({
+            where: {
+              levelCode: { [Op.in]: accessibleTiers },
+            },
+            attributes: ['id'],
+          });
+
+          for (const tc of tierCourses) {
+            const [uc, created] = await UserCourse.findOrCreate({
+              where: { userId: user.id, courseId: tc.id },
+              defaults: {
+                userId: user.id,
+                courseId: tc.id,
+                status: 'enrolled',
+                progress: 0,
+              },
+            });
+            if (!created && uc.status !== 'enrolled') {
+              await uc.update({ status: 'enrolled' });
+            }
+          }
+        } catch (tierEnrollErr) {
+          console.warn('Could not auto-enroll user into tier courses:', tierEnrollErr);
+        }
       }
     }
 

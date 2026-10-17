@@ -323,6 +323,24 @@ export const getCourses = async (req: Request, res: Response): Promise<any> => {
   }
 };
 
+// Get single course by ID with all chapters and assignments
+export const getCourseById = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { id } = req.params;
+    const course = await Course.findByPk(id, {
+      include: [
+        { model: Chapter, as: 'chapters' },
+        { model: Assignment, as: 'assignments' }
+      ]
+    });
+    if (!course) return res.status(404).json({ message: 'Course not found' });
+    return res.status(200).json(course);
+  } catch (error: any) {
+    console.error('Error fetching course by ID:', error);
+    return res.status(500).json({ message: 'Internal server error', error: error?.message });
+  }
+};
+
 // Create a new course
 export const createCourse = async (req: Request, res: Response): Promise<any> => {
   try {

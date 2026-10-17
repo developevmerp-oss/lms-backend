@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   getCourses,
+  getCourseById,
   createCourse,
   updateCourse,
   deleteCourse,
@@ -15,6 +16,7 @@ const router = Router();
 
 // Everyone (public / authenticated) can get courses
 router.get('/', getCourses);
+router.get('/:id', getCourseById);
 
 // Admin course management
 router.post('/seed', authenticate, authorize(['admin']), triggerSeedCourses);

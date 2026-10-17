@@ -132,6 +132,37 @@ export const updateStudent = async (req: AuthRequest, res: Response): Promise<an
       city: city !== undefined ? city : student.city,
       membershipExpiresAt: membershipExpiresAt !== undefined ? (membershipExpiresAt ? new Date(membershipExpiresAt) : null) : student.membershipExpiresAt,
     });
+
+    // Auto-enroll student into tier courses if membership level was upgraded
+    if (membershipLevel) {
+      const upper = (membershipLevel || '').toUpperCase();
+      const tierHierarchy: Record<string, string[]> = {
+        L0: ['L0'],
+        L1: ['L0', 'L1'],
+        L2: ['L0', 'L1', 'L2'],
+        L3: ['L0', 'L1', 'L2', 'L3'],
+        'L3+': ['L0', 'L1', 'L2', 'L3', 'L3+'],
+      };
+      const code = upper.includes('L3+') ? 'L3+' : upper.includes('L3') ? 'L3' : upper.includes('L2') ? 'L2' : upper.includes('L1') ? 'L1' : upper.includes('L0') ? 'L0' : null;
+      if (code && tierHierarchy[code]) {
+        try {
+          const tierCourses = await Course.findAll({
+            where: { levelCode: { [Op.in]: tierHierarchy[code] } },
+            attributes: ['id'],
+          });
+          for (const tc of tierCourses) {
+            const [uc, created] = await UserCourse.findOrCreate({
+              where: { userId: student.id, courseId: tc.id },
+              defaults: { userId: student.id, courseId: tc.id, status: 'enrolled', progress: 0 },
+            });
+            if (!created && uc.status !== 'enrolled') {
+              await uc.update({ status: 'enrolled' });
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
     return res.status(200).json(student);
   } catch (error) {
     console.error('Error updating student:', error);
