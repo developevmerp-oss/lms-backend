@@ -14,6 +14,8 @@ export interface CourseAttributes {
   offerStartDate?: Date | string | null;
   offerEndDate?: Date | string | null;
   offerActive?: boolean;
+  validityStartDate?: Date | string | null;
+  validityEndDate?: Date | string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -33,6 +35,8 @@ interface Course extends CourseAttributes {
   offerStartDate: Date | null;
   offerEndDate: Date | null;
   offerActive: boolean;
+  validityStartDate: Date | null;
+  validityEndDate: Date | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
@@ -95,6 +99,14 @@ Course.init(
       type: DataTypes.BOOLEAN,
       allowNull: true,
       defaultValue: false,
+    },
+    validityStartDate: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    validityEndDate: {
+      type: DataTypes.DATE,
+      allowNull: true,
     },
   },
   {

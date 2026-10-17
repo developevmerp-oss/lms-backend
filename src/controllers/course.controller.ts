@@ -338,6 +338,8 @@ export const createCourse = async (req: Request, res: Response): Promise<any> =>
       offerStartDate,
       offerEndDate,
       offerActive,
+      validityStartDate,
+      validityEndDate,
     } = req.body;
 
     try {
@@ -345,6 +347,8 @@ export const createCourse = async (req: Request, res: Response): Promise<any> =>
       await sequelize.query(`ALTER TABLE "Courses" ALTER COLUMN "levelCode" DROP NOT NULL;`);
       await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "price" VARCHAR(255);`);
       await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "order" INTEGER DEFAULT 0;`);
+      await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "validityStartDate" TIMESTAMP WITH TIME ZONE;`);
+      await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "validityEndDate" TIMESTAMP WITH TIME ZONE;`);
     } catch (_) {}
 
     const isStandalone = !levelCode || levelCode === 'NONE' || String(levelCode).trim() === '';
@@ -363,6 +367,8 @@ export const createCourse = async (req: Request, res: Response): Promise<any> =>
       offerStartDate: offerStartDate ? new Date(offerStartDate) : null,
       offerEndDate: offerEndDate ? new Date(offerEndDate) : null,
       offerActive: Boolean(offerActive),
+      validityStartDate: isStandalone && validityStartDate ? new Date(validityStartDate) : null,
+      validityEndDate: isStandalone && validityEndDate ? new Date(validityEndDate) : null,
     });
     res.status(201).json({ message: 'Course created successfully', course });
   } catch (error: any) {
@@ -387,6 +393,8 @@ export const updateCourse = async (req: Request, res: Response): Promise<any> =>
       offerStartDate,
       offerEndDate,
       offerActive,
+      validityStartDate,
+      validityEndDate,
     } = req.body;
 
     const course = await Course.findByPk(id);
@@ -438,6 +446,34 @@ export const updateCourse = async (req: Request, res: Response): Promise<any> =>
       resolvedPrice = price !== null && String(price).trim() !== '' ? String(price).trim() : null;
     }
 
+    // Validity dates apply strictly to individual/standalone courses
+    let parsedValidityStartDate = course.validityStartDate;
+    let parsedValidityEndDate = course.validityEndDate;
+
+    if (resolvedLevelCode !== null) {
+      // If course is assigned to a level tier, reset validity dates so level courses aren't affected
+      parsedValidityStartDate = null;
+      parsedValidityEndDate = null;
+    } else {
+      if (validityStartDate !== undefined) {
+        if (!validityStartDate) {
+          parsedValidityStartDate = null;
+        } else {
+          const d = new Date(validityStartDate);
+          if (!isNaN(d.getTime())) parsedValidityStartDate = d;
+        }
+      }
+
+      if (validityEndDate !== undefined) {
+        if (!validityEndDate) {
+          parsedValidityEndDate = null;
+        } else {
+          const d = new Date(validityEndDate);
+          if (!isNaN(d.getTime())) parsedValidityEndDate = d;
+        }
+      }
+    }
+
     await course.update({
       title: title !== undefined ? title : course.title,
       description: description !== undefined ? description : course.description,
@@ -450,6 +486,8 @@ export const updateCourse = async (req: Request, res: Response): Promise<any> =>
       offerStartDate: parsedStartDate,
       offerEndDate: parsedEndDate,
       offerActive: offerActive !== undefined ? Boolean(offerActive) : course.offerActive,
+      validityStartDate: parsedValidityStartDate,
+      validityEndDate: parsedValidityEndDate,
     });
     res.status(200).json({ message: 'Course updated successfully', course });
   } catch (error: any) {

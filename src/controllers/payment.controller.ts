@@ -154,13 +154,41 @@ export const createPaymentOrder = async (req: Request, res: Response): Promise<a
     let resolvedTierName = tierName;
 
     if (courseId) {
+      let c: any = null;
       try {
-        const c = await Course.findByPk(courseId);
-        if (c) {
-          resolvedTierCode = 'COURSE';
-          resolvedTierName = c.title;
-        }
+        c = await Course.findByPk(courseId);
       } catch (_) {}
+
+      if (c) {
+        resolvedTierCode = 'COURSE';
+        resolvedTierName = c.title;
+
+        // Validity check strictly for individual/standalone course
+        const isStandalone = !c.levelCode || c.levelCode === 'NONE' || String(c.levelCode).trim() === '';
+        if (isStandalone) {
+          const now = new Date();
+          if (c.validityStartDate && new Date(c.validityStartDate) > now) {
+            const startStr = new Date(c.validityStartDate).toLocaleDateString('en-IN', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+            });
+            return res.status(400).json({
+              message: `Enrollment for "${c.title}" will open on ${startStr}. Please check back then.`,
+            });
+          }
+          if (c.validityEndDate && new Date(c.validityEndDate) < now) {
+            const endStr = new Date(c.validityEndDate).toLocaleDateString('en-IN', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+            });
+            return res.status(400).json({
+              message: `Enrollment for "${c.title}" closed on ${endStr}. Course validity has expired.`,
+            });
+          }
+        }
+      }
     }
 
     const cleanAmount = parseFloat(amount);
@@ -367,6 +395,23 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
       try {
         targetCourse = await Course.findByPk(resolvedCourseId);
       } catch (_) {}
+    }
+
+    if (targetCourse) {
+      const isStandaloneCourse = !targetCourse.levelCode || targetCourse.levelCode === 'NONE' || String(targetCourse.levelCode).trim() === '';
+      if (isStandaloneCourse) {
+        const now = new Date();
+        if (targetCourse.validityStartDate && new Date(targetCourse.validityStartDate) > now) {
+          return res.status(400).json({
+            message: 'Course enrollment has not opened yet. Payment cannot be verified.',
+          });
+        }
+        if (targetCourse.validityEndDate && new Date(targetCourse.validityEndDate) < now) {
+          return res.status(400).json({
+            message: 'Course validity has expired. Payment cannot be verified for expired enrollment.',
+          });
+        }
+      }
     }
 
     const resolvedTierCode = isCoursePurchase ? 'COURSE' : tierCode;
