@@ -57,6 +57,8 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
     `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "validityStartDate" TIMESTAMP WITH TIME ZONE;`,
     `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "validityEndDate" TIMESTAMP WITH TIME ZONE;`,
     `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "validityMonths" INTEGER;`,
+    `ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "isPublished" BOOLEAN DEFAULT true;`,
+    `UPDATE "Courses" SET "isPublished" = true WHERE "isPublished" IS NULL;`,
     `ALTER TABLE "UserCourses" ADD COLUMN IF NOT EXISTS "enrolledAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW();`,
     `ALTER TABLE "UserCourses" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMP WITH TIME ZONE;`,
     `ALTER TABLE "UserCourses" ADD COLUMN IF NOT EXISTS "validityMonths" INTEGER;`,

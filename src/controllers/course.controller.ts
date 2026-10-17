@@ -360,6 +360,7 @@ export const createCourse = async (req: Request, res: Response): Promise<any> =>
       validityStartDate,
       validityEndDate,
       validityMonths,
+      isPublished,
     } = req.body;
 
     try {
@@ -371,12 +372,14 @@ export const createCourse = async (req: Request, res: Response): Promise<any> =>
       await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "validityStartDate" TIMESTAMP WITH TIME ZONE;`);
       await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "validityEndDate" TIMESTAMP WITH TIME ZONE;`);
       await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "validityMonths" INTEGER;`);
+      await sequelize.query(`ALTER TABLE "Courses" ADD COLUMN IF NOT EXISTS "isPublished" BOOLEAN DEFAULT true;`);
     } catch (_) {}
 
     const isStandalone = !levelCode || levelCode === 'NONE' || String(levelCode).trim() === '';
     const resolvedLevelCode = isStandalone ? null : String(levelCode).trim().toUpperCase();
     const resolvedPrice = price !== undefined && price !== null && String(price).trim() !== '' ? String(price).trim() : null;
     const resolvedValidityMonths = validityMonths !== undefined && validityMonths !== null && validityMonths !== '' ? parseInt(validityMonths, 10) : null;
+    const resolvedIsPublished = isPublished !== undefined ? Boolean(isPublished) : true;
 
     const course = await Course.create({
       title,
@@ -394,6 +397,7 @@ export const createCourse = async (req: Request, res: Response): Promise<any> =>
       validityStartDate: isStandalone && validityStartDate ? new Date(validityStartDate) : null,
       validityEndDate: isStandalone && validityEndDate ? new Date(validityEndDate) : null,
       validityMonths: resolvedValidityMonths,
+      isPublished: resolvedIsPublished,
     });
     res.status(201).json({ message: 'Course created successfully', course });
   } catch (error: any) {
@@ -422,6 +426,7 @@ export const updateCourse = async (req: Request, res: Response): Promise<any> =>
       validityStartDate,
       validityEndDate,
       validityMonths,
+      isPublished,
     } = req.body;
 
     const course = await Course.findByPk(id);
@@ -528,6 +533,7 @@ export const updateCourse = async (req: Request, res: Response): Promise<any> =>
       validityStartDate: parsedValidityStartDate,
       validityEndDate: parsedValidityEndDate,
       validityMonths: parsedValidityMonths,
+      isPublished: isPublished !== undefined ? Boolean(isPublished) : (course.isPublished !== undefined ? course.isPublished : true),
     });
     res.status(200).json({ message: 'Course updated successfully', course });
   } catch (error: any) {
