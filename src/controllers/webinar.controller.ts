@@ -17,6 +17,18 @@ function formatRelativeTime(date: Date): string {
   return `${diffDays} days ago`;
 }
 
+// Helper to safely parse webinar date with Indian Standard Time (+05:30) fallback if no timezone is provided
+export const parseWebinarDate = (dateStr: any): Date => {
+  if (!dateStr) return new Date();
+  if (dateStr instanceof Date) return dateStr;
+  const s = String(dateStr).trim();
+  // If string matches YYYY-MM-DDTHH:mm or YYYY-MM-DDTHH:mm:ss without timezone offset or 'Z'
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(s)) {
+    return new Date(`${s.length === 16 ? s + ':00' : s}+05:30`);
+  }
+  return new Date(s);
+};
+
 // Public: Get Next Upcoming Active Webinar for Live Countdown Timer & Links
 export const getNextUpcomingWebinar = async (_req: Request, res: Response): Promise<void> => {
   try {
@@ -25,25 +37,29 @@ export const getNextUpcomingWebinar = async (_req: Request, res: Response): Prom
     let event = await WebinarEvent.findOne({
       where: {
         isActive: true,
-        scheduledAt: { [Op.gt]: now },
-        status: { [Op.ne]: 'completed' },
+        status: { [Op.in]: ['live', 'upcoming'] },
+        scheduledAt: { [Op.gt]: new Date(now.getTime() - 2 * 60 * 60 * 1000) }, // Keep active within 2 hrs of starting
       },
       order: [['scheduledAt', 'ASC']],
     });
 
     if (!event) {
-      const target = new Date();
-      const day = target.getDay();
+      // Default to next upcoming Sunday 8:00 PM IST (which is 14:30:00 UTC)
+      const istOffsetMs = 5.5 * 60 * 60 * 1000;
+      const istNow = new Date(now.getTime() + istOffsetMs);
+      const day = istNow.getUTCDay();
       const diff = (7 - day) % 7;
-      target.setDate(target.getDate() + (diff === 0 && target.getHours() >= 20 ? 7 : diff));
-      target.setHours(20, 0, 0, 0);
+      const targetIst = new Date(istNow);
+      targetIst.setUTCDate(istNow.getUTCDate() + (diff === 0 && istNow.getUTCHours() >= 20 ? 7 : diff));
+      targetIst.setUTCHours(20, 0, 0, 0); // 8:00 PM IST
+      const targetUtc = new Date(targetIst.getTime() - istOffsetMs);
 
       res.status(200).json({
         success: true,
         data: {
           id: null,
           title: 'Resin Mastery Masterclass — Live with Vrajangna Patel',
-          scheduledAt: target.toISOString(),
+          scheduledAt: targetUtc.toISOString(),
           durationMinutes: 90,
           zoomJoinUrl: 'Emailed directly upon registration',
           whatsappGroupUrl: 'https://chat.whatsapp.com/sample-art-webinar-vip',
@@ -251,7 +267,7 @@ export const createWebinarEvent = async (req: Request, res: Response): Promise<v
     const event = await WebinarEvent.create({
       title: title || 'Resin Mastery Masterclass — Live with Vrajangna Patel',
       description,
-      scheduledAt: new Date(scheduledAt),
+      scheduledAt: parseWebinarDate(scheduledAt),
       durationMinutes: durationMinutes ? parseInt(durationMinutes, 10) : 90,
       zoomJoinUrl,
       whatsappGroupUrl,
@@ -278,7 +294,12 @@ export const updateWebinarEvent = async (req: Request, res: Response): Promise<v
       return;
     }
 
-    await event.update(req.body);
+    const updateData: any = { ...req.body };
+    if (updateData.scheduledAt) {
+      updateData.scheduledAt = parseWebinarDate(updateData.scheduledAt);
+    }
+
+    await event.update(updateData);
     res.status(200).json({ success: true, message: 'Webinar event updated successfully', data: event });
   } catch (error: any) {
     res.status(500).json({ success: false, message: error.message });
