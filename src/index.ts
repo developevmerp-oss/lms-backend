@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { sequelize } from './config/database';
+import './models';
 import routes from './routes';
 import { startKeepAlive } from './config/keepAlive';
 

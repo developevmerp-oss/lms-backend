@@ -5,9 +5,24 @@ dotenv.config();
 
 // Neon.tech PostgreSQL connection — MUST use the pooler endpoint (-pooler. in hostname)
 // to reduce per-connection overhead and stay within free-tier network transfer limits.
-const dbUrl =
+const rawDbUrl =
   process.env.DATABASE_URL ||
+  process.env.DB_URL ||
+  process.env.POSTGRES_URL ||
   'postgresql://neondb_owner:npg_JOwIH8s5gTuq@ep-divine-water-ay53xryl-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require';
+
+// Strip channel_binding parameter because pg driver does not support it with PgBouncer connection poolers
+const dbUrl = rawDbUrl
+  .replace(/&channel_binding=[^&]*/g, '')
+  .replace(/\?channel_binding=[^&]*&?/g, '?')
+  .replace(/\?$/, '');
+
+try {
+  const hostMatch = dbUrl.match(/@([^:/]+)/);
+  if (hostMatch && hostMatch[1]) {
+    console.log(`[DB] Connecting to database host: ${hostMatch[1]}`);
+  }
+} catch (_) {}
 
 // Enforce pooler URL — if someone accidentally uses the direct endpoint, warn them
 if (dbUrl.includes('neon.tech') && !dbUrl.includes('-pooler.')) {
