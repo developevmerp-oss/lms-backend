@@ -24,6 +24,7 @@ export interface LevelTierAttributes {
   installmentsEnabled?: boolean;
   totalInstallments?: number;
   installmentPlans?: any; // array of dynamic installment plans configured by admin
+  thumbnail?: string | null; // Level card banner / thumbnail image
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -53,6 +54,7 @@ class LevelTier extends Model<LevelTierAttributes, LevelTierCreationAttributes> 
   public installmentsEnabled?: boolean;
   public totalInstallments?: number;
   public installmentPlans?: any;
+  public thumbnail?: string | null;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -162,6 +164,11 @@ LevelTier.init(
       type: DataTypes.JSONB,
       allowNull: true,
       defaultValue: [],
+    },
+    thumbnail: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      defaultValue: null,
     },
   },
   {
