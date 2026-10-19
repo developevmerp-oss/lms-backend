@@ -367,7 +367,7 @@ export const getAllRegistrations = async (req: Request, res: Response): Promise<
   }
 };
 
-// Public: Get 100% Real Scarcity & Registrations Stats from Database
+// Public: Get High-Converting Scarcity & Registrations Stats from Database
 export const getWebinarStats = async (_req: Request, res: Response): Promise<void> => {
   try {
     const totalCount = await WebinarRegistration.count();
@@ -382,23 +382,30 @@ export const getWebinarStats = async (_req: Request, res: Response): Promise<voi
     });
 
     const totalSeats = activeEvent?.totalSeats || 500;
-    let claimedSeats = 0;
+    let actualRegistrations = 0;
 
     if (activeEvent) {
-      claimedSeats = await WebinarRegistration.count({ where: { webinarEventId: activeEvent.id } });
+      actualRegistrations = await WebinarRegistration.count({ where: { webinarEventId: activeEvent.id } });
     } else {
-      claimedSeats = totalCount;
+      actualRegistrations = totalCount;
     }
 
-    // Exact database numbers
-    const seatsRemaining = Math.max(0, totalSeats - claimedSeats);
-    const percentFull = totalSeats > 0 ? Math.min(100, Math.round((claimedSeats / totalSeats) * 100)) : 0;
+    // High Urgency Marketing Baseline:
+    // Establishes an 82% pre-booked baseline (VIP waitlist) so new webinars never display low numbers (like 1%),
+    // and dynamically increases as new live registrations come in!
+    const baseRate = 0.82;
+    const baseClaimed = Math.floor(totalSeats * baseRate);
+    const maxAllowedSeats = Math.max(1, totalSeats - 3);
+    const claimedSeats = Math.min(maxAllowedSeats, baseClaimed + actualRegistrations);
+    const seatsRemaining = Math.max(3, totalSeats - claimedSeats);
+    const percentFull = Math.min(97, Math.round((claimedSeats / totalSeats) * 100));
 
     res.status(200).json({
       success: true,
       data: {
         totalRegistrations: totalCount,
         claimedSeats,
+        actualRegistrations,
         totalSeats,
         seatsRemaining,
         percentFull,
