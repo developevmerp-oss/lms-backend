@@ -9,7 +9,7 @@ const rawDbUrl =
   process.env.DATABASE_URL ||
   process.env.DB_URL ||
   process.env.POSTGRES_URL ||
-  'postgresql://neondb_owner:npg_JOwIH8s5gTuq@ep-divine-water-ay53xryl-pooler.c-5.us-east-2.aws.neon.tech/neondb?sslmode=require';
+  'postgresql://neondb_owner:npg_oZLs6xSR9Kpz@ep-lively-scene-b4zxxfwb-pooler.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require';
 
 // Strip channel_binding parameter because pg driver does not support it with PgBouncer connection poolers
 const dbUrl = rawDbUrl
@@ -22,7 +22,7 @@ try {
   if (hostMatch && hostMatch[1]) {
     console.log(`[DB] Connecting to database host: ${hostMatch[1]}`);
   }
-} catch (_) {}
+} catch (_) { }
 
 // Enforce pooler URL — if someone accidentally uses the direct endpoint, warn them
 if (dbUrl.includes('neon.tech') && !dbUrl.includes('-pooler.')) {
@@ -42,30 +42,31 @@ export const sequelize = new Sequelize(dbUrl, {
   dialect: 'postgres',
   logging: false,
 
-  // ── Connection Pool — keep it small to reduce Neon network transfer ──
-  // Neon free tier is sensitive to connection count and data transfer.
-  // Keeping max=3 significantly reduces per-query overhead.
+  // ── Connection Pool ──
+  // Keeping min: 1 ensures at least 1 connection stays warm and ready, eliminating
+  // the 3-5 second SSL/TCP handshake delay on every API call.
   pool: {
-    max: 3,        // Max simultaneous DB connections (default is 5; lower = less transfer)
-    min: 0,        // Allow pool to drain to 0 when idle — saves compute hours too
+    max: 5,        // Max simultaneous DB connections
+    min: 1,        // Keep 1 warm connection ready so queries execute immediately
     acquire: 30000, // Max ms to wait for a connection before throwing an error
-    idle: 10000,   // Close connections idle for 10s (prevents stale connections)
-    evict: 15000,  // Run eviction checks every 15s
+    idle: 120000,  // Keep idle connections open for 2 minutes (instead of 10s)
+    evict: 30000,  // Eviction check every 30s
   },
 
   ...(isNeonOrSsl
     ? {
-        dialectOptions: {
-          ssl: {
-            require: true,
-            rejectUnauthorized: false,
-          },
-          // Set PostgreSQL statement timeout to prevent stuck queries from
-          // holding connections open and burning data transfer
-          statement_timeout: 30000,       // Kill queries running > 30 seconds
-          idle_in_transaction_session_timeout: 20000, // Kill idle transactions > 20s
-          connect_timeout: 15,            // TCP connect timeout in seconds
+      dialectOptions: {
+        ssl: {
+          require: true,
+          rejectUnauthorized: false,
         },
-      }
+        keepAlive: true,
+        // Set PostgreSQL statement timeout to prevent stuck queries from
+        // holding connections open and burning data transfer
+        statement_timeout: 30000,       // Kill queries running > 30 seconds
+        idle_in_transaction_session_timeout: 20000, // Kill idle transactions > 20s
+        connect_timeout: 15,            // TCP connect timeout in seconds
+      },
+    }
     : {}),
 });
