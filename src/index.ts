@@ -53,9 +53,32 @@ app.use(
   })
 );
 
-// ── Health endpoint (must be before auth middleware) ──
-app.get('/api/health', (_req, res) => {
-  res.status(200).json({ status: 'ok', message: 'LMS Backend is running', ts: Date.now() });
+// ── Health endpoint with DB diagnostics ──
+app.get('/api/health', async (_req, res) => {
+  try {
+    const [result]: any = await sequelize.query('SELECT current_database(), current_user, inet_server_addr()');
+    const [tables]: any = await sequelize.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public'");
+    res.status(200).json({
+      status: 'ok',
+      message: 'LMS Backend is running',
+      db: {
+        connected: true,
+        database: result?.[0]?.current_database,
+        user: result?.[0]?.current_user,
+        serverAddr: result?.[0]?.inet_server_addr,
+        tablesCount: tables?.length,
+        tables: tables?.map((t: any) => t.table_name),
+      },
+      ts: Date.now(),
+    });
+  } catch (err: any) {
+    res.status(200).json({
+      status: 'error',
+      message: 'LMS Backend running but DB error',
+      dbError: err.message,
+      ts: Date.now(),
+    });
+  }
 });
 
 app.use('/api', routes);
