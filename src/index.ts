@@ -63,6 +63,7 @@ app.get('/api/health', async (_req, res) => {
       message: 'LMS Backend is running',
       db: {
         connected: true,
+        host: (sequelize.config as any)?.host,
         database: result?.[0]?.current_database,
         user: result?.[0]?.current_user,
         serverAddr: result?.[0]?.inet_server_addr,
