@@ -133,6 +133,7 @@ User.init(
     sequelize,
     modelName: 'User',
     tableName: 'Users',
+    schema: 'public',
     paranoid: true,
     timestamps: true,
   }
