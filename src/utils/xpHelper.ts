@@ -29,10 +29,19 @@ export const canEarnXp = (user: any): boolean => {
   }
   return (
     level.includes('L1') ||
+    level.includes('LEVEL 1') ||
+    level.includes('LEVEL-1') ||
+    level.includes('LEVEL1') ||
     level.includes('SILVER') ||
     level.includes('L2') ||
+    level.includes('LEVEL 2') ||
+    level.includes('LEVEL-2') ||
+    level.includes('LEVEL2') ||
     level.includes('GOLD') ||
     level.includes('L3') ||
+    level.includes('LEVEL 3') ||
+    level.includes('LEVEL-3') ||
+    level.includes('LEVEL3') ||
     level.includes('DIAMOND') ||
     level.includes('RENAISSANCE') ||
     level.includes('MASTERS')
@@ -49,6 +58,9 @@ export const canRedeemMerchStore = (user: any): boolean => {
   const level = ((user.membershipLevel || user.rank || '') + '').toUpperCase();
   return (
     level.includes('L3') ||
+    level.includes('LEVEL 3') ||
+    level.includes('LEVEL-3') ||
+    level.includes('LEVEL3') ||
     level.includes('DIAMOND') ||
     level.includes('RENAISSANCE') ||
     level.includes('MASTERS')
