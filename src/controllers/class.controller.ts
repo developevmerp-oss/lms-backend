@@ -2,7 +2,47 @@ import { Request, Response } from 'express';
 import db from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
-const { LiveClass, ClassAttendance, User, Notification } = db;
+const { LiveClass, ClassAttendance, User, Notification, LevelTier } = db;
+
+const isStudentMatchingTiers = (student: any, targetLevels: string[], dbTiers: any[] = []): boolean => {
+  if (!targetLevels || targetLevels.length === 0) return true;
+  if (targetLevels.some(l => l.toUpperCase() === 'ALL')) return true;
+
+  const raw = ((student.membershipLevel || student.rank || '') + '').toUpperCase().trim();
+  if (!raw) {
+    return targetLevels.some(l => l.toUpperCase() === 'L0' || l.toUpperCase() === 'GENERAL');
+  }
+
+  for (const target of targetLevels) {
+    const t = target.toUpperCase().trim();
+    if (!t) continue;
+    if (t === 'ALL') return true;
+
+    // Direct match
+    if (raw.includes(t)) return true;
+
+    // Check against DB tiers dynamically
+    const matchedDbTier = dbTiers.find((d: any) => 
+      (d.code && d.code.toUpperCase() === t) ||
+      (d.name && d.name.toUpperCase() === t)
+    );
+    if (matchedDbTier) {
+      if (raw.includes((matchedDbTier.name || '').toUpperCase()) || 
+          raw.includes((matchedDbTier.code || '').toUpperCase())) {
+        return true;
+      }
+    }
+
+    // Standard naming conventions
+    if (t === 'L0' && (raw.includes('FAST START') || raw.includes('FAST TRACK') || raw === 'L0')) return true;
+    if (t === 'L1' && (raw.includes('SILVER') || raw.includes('LEVEL 1') || raw.includes('LEVEL-1'))) return true;
+    if (t === 'L2' && (raw.includes('GOLD') || raw.includes('LEVEL 2') || raw.includes('LEVEL-2'))) return true;
+    if (t === 'L3' && (raw.includes('DIAMOND') || raw.includes('RENAISSANCE') || raw.includes('LEVEL 3') || raw.includes('LEVEL-3'))) return true;
+    if (t === 'L3+' && (raw.includes('MASTERS') || raw.includes('L3+'))) return true;
+  }
+
+  return false;
+};
 
 const DEFAULT_SAMPLE_CLASSES = [
   {
@@ -109,7 +149,7 @@ export const getAllClasses = async (req: AuthRequest, res: Response): Promise<an
 // ── CREATE LIVE CLASS (ADMIN) ──
 export const createClass = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
-    const { title, description, scheduledAt, durationMinutes, meetingUrl, recordingUrl, targetLevel, status, instructor } = req.body;
+    const { title, description, scheduledAt, durationMinutes, meetingUrl, recordingUrl, targetLevel, status, instructor, sendNotification } = req.body;
 
     if (!title || !scheduledAt) {
       return res.status(400).json({ message: 'Class title and scheduled date/time are required' });
@@ -127,6 +167,51 @@ export const createClass = async (req: AuthRequest, res: Response): Promise<any>
       instructor: instructor || 'Vrajangna Patel',
     });
 
+    // ── DISPATCH NOTIFICATIONS TO TARGET LEVEL STUDENTS ──
+    if (sendNotification !== false) {
+      try {
+        const targetStr = (targetLevel || 'All').toString().trim();
+        let targetLevels: string[] = [];
+        if (targetStr !== 'All' && targetStr.toLowerCase() !== 'all') {
+          targetLevels = targetStr.split(',').map((s: string) => s.trim().toUpperCase());
+        }
+
+        const [students, dbTiers] = await Promise.all([
+          User.findAll({
+            where: { role: 'student' },
+            attributes: ['id', 'name', 'membershipLevel', 'rank']
+          }),
+          LevelTier ? LevelTier.findAll() : Promise.resolve([])
+        ]);
+
+        const eligibleStudents = students.filter((s: any) => isStudentMatchingTiers(s, targetLevels, dbTiers));
+
+        if (eligibleStudents.length > 0) {
+          const dateObj = new Date(scheduledAt);
+          const dateStr = dateObj.toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+
+          const notificationRecords = eligibleStudents.map((s: any) => ({
+            userId: s.id,
+            title: `🔴 Live Class: ${title.trim()}`,
+            message: `Live class "${title.trim()}" is scheduled for ${dateStr}. Click to view details and join live!`,
+            type: 'event',
+            link: '/student/events',
+            targetAudience: targetStr,
+            isRead: false,
+          }));
+
+          await Notification.bulkCreate(notificationRecords);
+        }
+      } catch (notifErr) {
+        console.warn('Could not dispatch live class notifications:', notifErr);
+      }
+    }
+
     return res.status(201).json({ success: true, message: 'Live class scheduled successfully', data: newClass });
   } catch (error: any) {
     console.error('Error creating class:', error);
@@ -138,7 +223,7 @@ export const createClass = async (req: AuthRequest, res: Response): Promise<any>
 export const updateClass = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const { classId } = req.params;
-    const { title, description, scheduledAt, durationMinutes, meetingUrl, recordingUrl, targetLevel, status, instructor } = req.body;
+    const { title, description, scheduledAt, durationMinutes, meetingUrl, recordingUrl, targetLevel, status, instructor, sendNotification } = req.body;
 
     const liveClass = await LiveClass.findByPk(classId);
     if (!liveClass) return res.status(404).json({ message: 'Live class not found' });
@@ -154,6 +239,50 @@ export const updateClass = async (req: AuthRequest, res: Response): Promise<any>
       status: status !== undefined ? status : liveClass.status,
       instructor: instructor !== undefined ? instructor : liveClass.instructor,
     });
+
+    if (sendNotification) {
+      try {
+        const targetStr = (liveClass.targetLevel || 'All').toString().trim();
+        let targetLevels: string[] = [];
+        if (targetStr !== 'All' && targetStr.toLowerCase() !== 'all') {
+          targetLevels = targetStr.split(',').map((s: string) => s.trim().toUpperCase());
+        }
+
+        const [students, dbTiers] = await Promise.all([
+          User.findAll({
+            where: { role: 'student' },
+            attributes: ['id', 'name', 'membershipLevel', 'rank']
+          }),
+          LevelTier ? LevelTier.findAll() : Promise.resolve([])
+        ]);
+
+        const eligibleStudents = students.filter((s: any) => isStudentMatchingTiers(s, targetLevels, dbTiers));
+
+        if (eligibleStudents.length > 0) {
+          const dateObj = new Date(liveClass.scheduledAt);
+          const dateStr = dateObj.toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+
+          const notificationRecords = eligibleStudents.map((s: any) => ({
+            userId: s.id,
+            title: `🔔 Live Class Update: ${liveClass.title}`,
+            message: `Update for live class "${liveClass.title}" scheduled for ${dateStr}. Click to view details!`,
+            type: 'event',
+            link: '/student/events',
+            targetAudience: targetStr,
+            isRead: false,
+          }));
+
+          await Notification.bulkCreate(notificationRecords);
+        }
+      } catch (notifErr) {
+        console.warn('Could not dispatch live class update notification:', notifErr);
+      }
+    }
 
     return res.status(200).json({ success: true, message: 'Class updated successfully', data: liveClass });
   } catch (error: any) {
