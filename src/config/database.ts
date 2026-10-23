@@ -41,6 +41,7 @@ const isNeonOrSsl =
 export const sequelize = new Sequelize(dbUrl, {
   dialect: 'postgres',
   logging: false,
+  schema: 'public',
 
   // ── Connection Pool ──
   // Keeping min: 1 ensures at least 1 connection stays warm and ready, eliminating
@@ -53,14 +54,15 @@ export const sequelize = new Sequelize(dbUrl, {
     evict: 30000,  // Eviction check every 30s
   },
 
-  ...(isNeonOrSsl
-    ? {
-      dialectOptions: {
-        ssl: {
-          require: true,
-          rejectUnauthorized: false,
-        },
-        keepAlive: true,
+  dialectOptions: {
+    options: '-c search_path=public',
+    ...(isNeonOrSsl
+      ? {
+          ssl: {
+            require: true,
+            rejectUnauthorized: false,
+          },
+          keepAlive: true,
         // Set PostgreSQL statement timeout to prevent stuck queries from
         // holding connections open and burning data transfer
         statement_timeout: 30000,       // Kill queries running > 30 seconds

@@ -112,6 +112,13 @@ const startServer = async () => {
     await sequelize.authenticate();
     console.log('✅ Database connected');
 
+    // Ensure search_path is set to public so tables in public are always resolved
+    try {
+      await sequelize.query('SET search_path TO public;');
+      await sequelize.query('ALTER ROLE neondb_owner SET search_path TO public;');
+      await sequelize.query('ALTER DATABASE neondb SET search_path TO public;');
+    } catch (_) {}
+
     // Auto-create any missing tables in the database
     await sequelize.sync();
     console.log('✅ Database models synchronized');
