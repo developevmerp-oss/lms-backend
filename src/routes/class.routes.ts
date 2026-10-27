@@ -7,6 +7,8 @@ import {
   deleteClass,
   joinClassAndMarkAttendance,
   toggleStudentAttendance,
+  getAttendanceHistory,
+  exportAttendanceHistory,
 } from '../controllers/class.controller';
 
 const router = Router();
@@ -14,6 +16,11 @@ const router = Router();
 // Student & Admin accessible
 router.use(authenticate);
 router.get('/', getAllClasses);
+
+// Attendance History & Excel Export (Admin) — declared before /:classId
+router.get('/attendance/export', requireAdmin, exportAttendanceHistory);
+router.get('/attendance/history', requireAdmin, getAttendanceHistory);
+
 router.post('/:classId/join', joinClassAndMarkAttendance);
 
 // Admin-only management routes

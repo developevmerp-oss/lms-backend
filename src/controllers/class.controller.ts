@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { Op } from 'sequelize';
 import db from '../models';
 import { AuthRequest } from '../middleware/auth.middleware';
 
@@ -84,6 +85,9 @@ export const getAllClasses = async (req: AuthRequest, res: Response): Promise<an
     const userId = req.user?.id;
 
     let classes = await LiveClass.findAll({
+      where: {
+        status: { [Op.ne]: 'deleted' }
+      },
       order: [['scheduledAt', 'DESC']],
       include: [
         {
@@ -94,9 +98,13 @@ export const getAllClasses = async (req: AuthRequest, res: Response): Promise<an
       ],
     });
 
-    if (!classes || classes.length === 0) {
+    const totalCount = await LiveClass.count();
+    if (totalCount === 0) {
       await LiveClass.bulkCreate(DEFAULT_SAMPLE_CLASSES);
       classes = await LiveClass.findAll({
+        where: {
+          status: { [Op.ne]: 'deleted' }
+        },
         order: [['scheduledAt', 'DESC']],
         include: [
           {
@@ -292,23 +300,28 @@ export const updateClass = async (req: AuthRequest, res: Response): Promise<any>
 };
 
 // ── DELETE LIVE CLASS (ADMIN) ──
+// Marks class status as 'deleted' so it is removed from active schedules,
+// but PRESERVES the student attendance history and XP records for Excel export!
 export const deleteClass = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const { classId } = req.params;
     const liveClass = await LiveClass.findByPk(classId);
     if (!liveClass) return res.status(404).json({ message: 'Live class not found' });
 
-    await ClassAttendance.destroy({ where: { classId } });
-    await liveClass.destroy();
+    // Do NOT delete ClassAttendance rows! Mark class as deleted so history is preserved.
+    await liveClass.update({ status: 'deleted' });
 
-    return res.status(200).json({ success: true, message: 'Class deleted successfully' });
+    return res.status(200).json({
+      success: true,
+      message: 'Class removed from active schedule. Student attendance records have been safely preserved for Excel export.',
+    });
   } catch (error: any) {
     console.error('Error deleting class:', error);
     return res.status(500).json({ message: 'Failed to delete class', error: error?.message });
   }
 };
 
-// ── STUDENT JOINS LIVE CLASS -> MARKS ATTENDANCE & AWARDS XP ──
+// ── STUDENT JOINS LIVE CLASS -> MARKS ATTENDANCE & AWARDS +100 XP ──
 export const joinClassAndMarkAttendance = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const { classId } = req.params;
@@ -338,29 +351,29 @@ export const joinClassAndMarkAttendance = async (req: AuthRequest, res: Response
       await attendance.update({ attended: true, joinedAt: new Date() });
     }
 
-    // 2. Award Attendance XP to student (+50 XP)
+    // 2. Award Attendance XP to student (+100 XP)
     const student = await User.findByPk(userId);
     if (student && created) {
       await student.update({
-        points: (student.points || 0) + 50,
-        xpPoints: (student.xpPoints || 0) + 50,
+        points: (student.points || 0) + 100,
+        xpPoints: (student.xpPoints || 0) + 100,
       });
 
       // Send confirmation notification
       try {
         await Notification.create({
           userId,
-          title: `✅ Live Class Attendance Marked (+50 XP)!`,
-          message: `Your attendance for "${liveClass.title}" was recorded. Keep mastering your resin artistry!`,
+          title: `✅ Live Class Attendance Marked (+100 XP)!`,
+          message: `Your attendance for "${liveClass.title}" was recorded. +100 XP awarded to your profile!`,
           type: 'milestone',
-          read: false,
+          isRead: false,
         });
       } catch (_) {}
     }
 
     return res.status(200).json({
       success: true,
-      message: 'Attendance recorded successfully (+50 XP Awarded!)',
+      message: 'Attendance recorded successfully (+100 XP Awarded!)',
       meetingUrl: liveClass.meetingUrl || 'https://zoom.us',
       joinedAt: attendance.joinedAt,
     });
@@ -398,5 +411,163 @@ export const toggleStudentAttendance = async (req: AuthRequest, res: Response): 
   } catch (error: any) {
     console.error('Error toggling attendance:', error);
     return res.status(500).json({ message: 'Failed to toggle attendance', error: error?.message });
+  }
+};
+
+// ── GET FULL ATTENDANCE HISTORY (ADMIN) ──
+export const getAttendanceHistory = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { classId } = req.query;
+
+    const whereCondition: any = {};
+    if (classId) {
+      whereCondition.classId = classId;
+    }
+
+    const attendances = await ClassAttendance.findAll({
+      where: whereCondition,
+      order: [['joinedAt', 'DESC']],
+      include: [
+        {
+          model: LiveClass,
+          as: 'class',
+          attributes: ['id', 'title', 'scheduledAt', 'durationMinutes', 'instructor', 'targetLevel', 'status'],
+        },
+        {
+          model: User,
+          as: 'user',
+          attributes: ['id', 'name', 'email', 'phone', 'membershipLevel', 'rank', 'points', 'xpPoints', 'city', 'avatarUrl'],
+        },
+      ],
+    });
+
+    const formatted = attendances.map((att: any) => ({
+      id: att.id,
+      classId: att.classId,
+      classTitle: att.class?.title || 'Concluded Masterclass',
+      classDate: att.class?.scheduledAt || att.joinedAt,
+      classStatus: att.class?.status === 'deleted' ? 'Removed / Archived' : (att.class?.status || 'Concluded'),
+      instructor: att.class?.instructor || 'Vrajangna Patel',
+      targetLevel: att.class?.targetLevel || 'All',
+      userId: att.userId,
+      studentName: att.user?.name || 'Unknown Student',
+      studentEmail: att.user?.email || 'N/A',
+      studentPhone: att.user?.phone || 'N/A',
+      studentLevel: att.user?.membershipLevel || att.user?.rank || 'Fast Track (L0)',
+      studentCity: att.user?.city || 'N/A',
+      studentAvatar: att.user?.avatarUrl,
+      attended: att.attended,
+      joinedAt: att.joinedAt,
+      xpAwarded: 100,
+      totalPoints: att.user?.points || 0,
+      notes: att.notes,
+    }));
+
+    return res.status(200).json({ success: true, count: formatted.length, data: formatted });
+  } catch (error: any) {
+    console.error('Error fetching attendance history:', error);
+    return res.status(500).json({ message: 'Failed to fetch attendance history', error: error?.message });
+  }
+};
+
+// ── EXPORT ATTENDANCE HISTORY TO CSV / EXCEL FORMAT (ADMIN) ──
+export const exportAttendanceHistory = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { classId } = req.query;
+
+    const whereCondition: any = {};
+    if (classId) {
+      whereCondition.classId = classId;
+    }
+
+    const attendances = await ClassAttendance.findAll({
+      where: whereCondition,
+      order: [['joinedAt', 'DESC']],
+      include: [
+        {
+          model: LiveClass,
+          as: 'class',
+          attributes: ['id', 'title', 'scheduledAt', 'durationMinutes', 'instructor', 'targetLevel', 'status'],
+        },
+        {
+          model: User,
+          as: 'user',
+          attributes: ['id', 'name', 'email', 'phone', 'membershipLevel', 'rank', 'points', 'xpPoints', 'city'],
+        },
+      ],
+    });
+
+    const headers = [
+      'Class Title',
+      'Class Date & Time',
+      'Duration (Mins)',
+      'Mentor / Instructor',
+      'Target Level Access',
+      'Class Status',
+      'Student Name',
+      'Student Email',
+      'Student Phone',
+      'Student City',
+      'Membership Tier',
+      'Attended Status',
+      'Joined Date & Time',
+      'Attendance XP Earned',
+      'Student Current Total XP'
+    ];
+
+    const escapeCsv = (str: any) => {
+      if (str === null || str === undefined) return '""';
+      const s = String(str).replace(/"/g, '""');
+      return `"${s}"`;
+    };
+
+    const rows = attendances.map((att: any) => {
+      const cls = att.class || {};
+      const usr = att.user || {};
+
+      const classDateStr = cls.scheduledAt
+        ? new Date(cls.scheduledAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
+        : 'N/A';
+
+      const joinDateStr = att.joinedAt
+        ? new Date(att.joinedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
+        : 'N/A';
+
+      const classStatusLabel = cls.status === 'deleted'
+        ? 'Removed (Session Concluded)'
+        : (cls.status ? cls.status.toUpperCase() : 'CONCLUDED');
+
+      return [
+        escapeCsv(cls.title || 'Live Masterclass Session'),
+        escapeCsv(classDateStr),
+        escapeCsv(cls.durationMinutes || 60),
+        escapeCsv(cls.instructor || 'Vrajangna Patel'),
+        escapeCsv(cls.targetLevel || 'All'),
+        escapeCsv(classStatusLabel),
+        escapeCsv(usr.name || 'Unknown Student'),
+        escapeCsv(usr.email || 'N/A'),
+        escapeCsv(usr.phone || 'N/A'),
+        escapeCsv(usr.city || 'N/A'),
+        escapeCsv(usr.membershipLevel || usr.rank || 'Fast Track (L0)'),
+        escapeCsv(att.attended ? 'Present / Attended' : 'Registered'),
+        escapeCsv(joinDateStr),
+        escapeCsv(att.attended ? '100 XP' : '0 XP'),
+        escapeCsv(usr.points || 0),
+      ].join(',');
+    });
+
+    // Add BOM for Microsoft Excel UTF-8 display
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+
+    const filename = classId
+      ? `live_class_attendance_${String(classId).slice(0, 8)}.csv`
+      : `all_live_classes_attendance_history_${new Date().toISOString().slice(0, 10)}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.status(200).send(csvContent);
+  } catch (error: any) {
+    console.error('Error exporting attendance history:', error);
+    return res.status(500).json({ message: 'Failed to export attendance history', error: error?.message });
   }
 };
