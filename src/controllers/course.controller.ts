@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import db from '../models';
 import { sequelize } from '../config/database';
+import { clearPublicCoursesCache } from './dashboard.controller';
 
 const { Course, Chapter, Assignment } = db;
 
@@ -258,6 +259,7 @@ export const triggerSeedCourses = async (req: Request, res: Response): Promise<a
         { model: Chapter, as: 'chapters' }
       ]
     });
+    clearCoursesCache();
     res.status(200).json({ message: 'All 30 level-wise courses synced to database successfully!', courses });
   } catch (error: any) {
     console.error('Error seeding courses:', error);
@@ -265,9 +267,26 @@ export const triggerSeedCourses = async (req: Request, res: Response): Promise<a
   }
 };
 
+
+// In-memory cache for course list view to save Neon DB bandwidth
+let cachedCourses: any[] | null = null;
+let coursesCacheAt = 0;
+const COURSES_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes cache
+
+export const clearCoursesCache = () => {
+  cachedCourses = null;
+  coursesCacheAt = 0;
+  clearPublicCoursesCache();
+};
+
 // Get all courses with Level-wise ordering
 export const getCourses = async (req: Request, res: Response): Promise<any> => {
   try {
+    const now = Date.now();
+    if (cachedCourses && (now - coursesCacheAt) < COURSES_CACHE_TTL_MS) {
+      return res.status(200).json(cachedCourses);
+    }
+
     let rawCourses: any[] = [];
     try {
       rawCourses = await Course.findAll({
@@ -316,6 +335,8 @@ export const getCourses = async (req: Request, res: Response): Promise<any> => {
       return courseJson;
     });
 
+    cachedCourses = sanitizedCourses;
+    coursesCacheAt = now;
     return res.status(200).json(sanitizedCourses);
   } catch (error: any) {
     console.error('Error fetching courses:', error);
@@ -399,6 +420,7 @@ export const createCourse = async (req: Request, res: Response): Promise<any> =>
       validityMonths: resolvedValidityMonths,
       isPublished: resolvedIsPublished,
     });
+    clearCoursesCache();
     res.status(201).json({ message: 'Course created successfully', course });
   } catch (error: any) {
     console.error('Error creating course:', error);
@@ -535,6 +557,7 @@ export const updateCourse = async (req: Request, res: Response): Promise<any> =>
       validityMonths: parsedValidityMonths,
       isPublished: isPublished !== undefined ? Boolean(isPublished) : (course.isPublished !== undefined ? course.isPublished : true),
     });
+    clearCoursesCache();
     res.status(200).json({ message: 'Course updated successfully', course });
   } catch (error: any) {
     console.error('Error updating course:', error);
@@ -551,6 +574,7 @@ export const deleteCourse = async (req: Request, res: Response): Promise<any> =>
 
     await Chapter.destroy({ where: { courseId: id } });
     await course.destroy();
+    clearCoursesCache();
     res.status(200).json({ message: 'Course and chapters deleted successfully' });
   } catch (error: any) {
     console.error('Error deleting course:', error);
@@ -578,6 +602,7 @@ export const addChapter = async (req: Request, res: Response): Promise<any> => {
       pdfUrl: cleanPdfUrl,
       courseId,
     });
+    clearCoursesCache();
     res.status(201).json({ message: 'Chapter added successfully', chapter });
   } catch (error: any) {
     console.error('Error adding chapter:', error);
@@ -602,6 +627,7 @@ export const updateChapter = async (req: Request, res: Response): Promise<any> =
       videoUrl: cleanVideoUrl,
       pdfUrl: cleanPdfUrl,
     });
+    clearCoursesCache();
     res.status(200).json({ message: 'Chapter updated successfully', chapter });
   } catch (error: any) {
     console.error('Error updating chapter:', error);
@@ -617,6 +643,7 @@ export const deleteChapter = async (req: Request, res: Response): Promise<any> =
     if (!chapter) return res.status(404).json({ message: 'Chapter not found' });
 
     await chapter.destroy();
+    clearCoursesCache();
     res.status(200).json({ message: 'Chapter deleted successfully' });
   } catch (error: any) {
     console.error('Error deleting chapter:', error);

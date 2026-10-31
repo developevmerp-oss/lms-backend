@@ -9,7 +9,7 @@ const { User, Course, Submission, Skill, Badge, Portfolio, Milestone, SalesRecor
 // In-memory cache for level tiers
 let cachedLevelTiers: any[] | null = null;
 let levelTierCacheAt = 0;
-const LEVEL_CACHE_TTL_MS = 5000; // 5 seconds cache for fast response and instant updates
+const LEVEL_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes cache to save DB network transfer (cleared on admin changes)
 
 export function clearLevelTierCache() {
   cachedLevelTiers = null;
@@ -418,12 +418,28 @@ export const getPublicBadges = async (req: Request, res: Response): Promise<any>
   }
 };
 
+// In-memory cache for public courses to save Neon DB bandwidth
+let cachedPublicCourses: any[] | null = null;
+let publicCoursesCacheAt = 0;
+const PUBLIC_COURSES_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes cache
+
+export function clearPublicCoursesCache() {
+  cachedPublicCourses = null;
+  publicCoursesCacheAt = 0;
+}
+
 // GET all public courses (For landing page dynamic level mapping)
 export const getPublicCourses = async (req: Request, res: Response): Promise<any> => {
   try {
+    const now = Date.now();
+    if (cachedPublicCourses && (now - publicCoursesCacheAt) < PUBLIC_COURSES_CACHE_TTL_MS) {
+      return res.status(200).json(cachedPublicCourses);
+    }
     const courses = await db.Course.findAll({
       order: [['order', 'ASC'], ['createdAt', 'ASC']]
     });
+    cachedPublicCourses = courses;
+    publicCoursesCacheAt = now;
     return res.status(200).json(courses);
   } catch (error) {
     console.error('Error fetching public courses:', error);
