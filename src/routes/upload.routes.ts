@@ -4,93 +4,98 @@ import path from 'path';
 import fs from 'fs';
 import { offloadLocalFile } from '../middleware/offloadDataUrls';
 
+/**
+ * Upload endpoints (multipart/form-data). When CLOUDINARY_* is configured every file is pushed to
+ * Cloudinary and the https URL is returned; otherwise the file stays on the server disk (/uploads/...).
+ *
+ *   POST /api/upload/image     -> images only          (form field "file" or "image")
+ *   POST /api/upload/video     -> videos (and, for older clients, any file)  (field "video" or "file")
+ *   POST /api/upload/document  -> pdf / office / text / zip   (field "file", "document" or "pdf")
+ *   POST /api/upload/pdf       -> kept for older clients (field "pdf")
+ */
 const router = Router();
 
-const getUploadsDir = () => {
-  const dir = path.join(process.cwd(), 'uploads/videos');
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+const ensureDir = (name: string) => {
+  const dir = path.join(process.cwd(), 'uploads', name);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   return dir;
 };
 
-const storage = multer.diskStorage({
-  destination: (_req: any, _file: any, cb: any) => {
-    cb(null, getUploadsDir());
+const makeStorage = (folder: string, prefix: string, fallbackExt: string) =>
+  multer.diskStorage({
+    destination: (_req: any, _file: any, cb: any) => cb(null, ensureDir(folder)),
+    filename: (_req: any, file: any, cb: any) => {
+      const ext = path.extname(file.originalname) || fallbackExt;
+      const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+      cb(null, `${prefix}-${uniqueSuffix}${ext}`);
+    },
+  });
+
+const DOC_EXTENSIONS = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv', '.zip', '.rar'];
+
+// ── Typed uploaders ──
+const imageUploader = multer({
+  storage: makeStorage('images', 'image', '.png'),
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
+  fileFilter: (_req: any, file: any, cb: any) => {
+    const ok = file.mimetype.startsWith('image/') && file.mimetype !== 'image/svg+xml';
+    cb(ok ? null : new Error('Only image files (PNG, JPG, WEBP, GIF) are allowed on this route'), ok);
   },
-  filename: (_req: any, file: any, cb: any) => {
-    const ext = path.extname(file.originalname) || '.mp4';
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `video-${uniqueSuffix}${ext}`);
+}).fields([{ name: 'file', maxCount: 1 }, { name: 'image', maxCount: 1 }]);
+
+const documentUploader = multer({
+  storage: makeStorage('documents', 'doc', '.pdf'),
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+  fileFilter: (_req: any, file: any, cb: any) => {
+    const ok = DOC_EXTENSIONS.includes(path.extname(file.originalname).toLowerCase());
+    cb(ok ? null : new Error(`Only document files (${DOC_EXTENSIONS.join(', ')}) are allowed on this route`), ok);
   },
-});
+}).fields([{ name: 'file', maxCount: 1 }, { name: 'document', maxCount: 1 }, { name: 'pdf', maxCount: 1 }]);
 
-const upload = multer({
-  storage,
-  limits: { fileSize: 500 * 1024 * 1024 }, // 500MB max
-});
+// Video route keeps accepting any file type so older frontends (which send every file here) keep working.
+const videoUploader = multer({
+  storage: makeStorage('videos', 'video', '.mp4'),
+  limits: { fileSize: 500 * 1024 * 1024 }, // 500MB
+}).fields([{ name: 'video', maxCount: 1 }, { name: 'file', maxCount: 1 }]);
 
-// Direct Multipart Video Upload Endpoint
-router.post('/video', upload.single('video'), async (req: any, res: any) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'No video file provided' });
-    }
+// Older PDF route (field "pdf")
+const pdfUploader = multer({
+  storage: makeStorage('documents', 'doc', '.pdf'),
+  limits: { fileSize: 100 * 1024 * 1024 },
+}).single('pdf');
 
-    const remoteUrl = await offloadLocalFile(req.file.path, req.file.mimetype || 'application/octet-stream');
-    const relativePath = remoteUrl || `/uploads/videos/${req.file.filename}`;
-    return res.status(200).json({
-      success: true,
-      url: relativePath,
-      message: 'Video uploaded successfully',
-    });
-  } catch (error: any) {
-    return res.status(500).json({ message: error.message || 'Video upload failed' });
-  }
-});
+// Runs a multer middleware and turns its errors into a clean JSON 400
+const run = (uploader: any) => (req: any, res: any, next: any) =>
+  uploader(req, res, (err: any) => {
+    if (err) return res.status(400).json({ message: err.message || 'Upload failed' });
+    next();
+  });
 
-// PDF / Notes Document Upload Storage
-const getPdfUploadsDir = () => {
-  const dir = path.join(process.cwd(), 'uploads/documents');
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  return dir;
+const firstFile = (req: any): any => {
+  if (req.file) return req.file;
+  const groups = req.files ? Object.values(req.files as Record<string, any[]>) : [];
+  return groups.length ? (groups[0] as any[])[0] : undefined;
 };
 
-const pdfStorage = multer.diskStorage({
-  destination: (_req: any, _file: any, cb: any) => {
-    cb(null, getPdfUploadsDir());
-  },
-  filename: (_req: any, file: any, cb: any) => {
-    const ext = path.extname(file.originalname) || '.pdf';
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `doc-${uniqueSuffix}${ext}`);
-  },
-});
-
-const uploadPdf = multer({
-  storage: pdfStorage,
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB max for documents
-});
-
-// Direct Multipart PDF Upload Endpoint
-router.post('/pdf', uploadPdf.single('pdf'), async (req: any, res: any) => {
+const respond = (folder: string, label: string, defaultMime: string) => async (req: any, res: any) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'No PDF file provided' });
-    }
+    const file = firstFile(req);
+    if (!file) return res.status(400).json({ message: `No ${label.toLowerCase()} file provided` });
 
-    const remoteUrl = await offloadLocalFile(req.file.path, req.file.mimetype || 'application/pdf');
-    const relativePath = remoteUrl || `/uploads/documents/${req.file.filename}`;
+    const remoteUrl = await offloadLocalFile(file.path, file.mimetype || defaultMime);
     return res.status(200).json({
       success: true,
-      url: relativePath,
-      message: 'PDF uploaded successfully',
+      url: remoteUrl || `/uploads/${folder}/${file.filename}`,
+      message: `${label} uploaded successfully`,
     });
   } catch (error: any) {
-    return res.status(500).json({ message: error.message || 'PDF upload failed' });
+    return res.status(500).json({ message: error.message || `${label} upload failed` });
   }
-});
+};
+
+router.post('/image', run(imageUploader), respond('images', 'Image', 'image/png'));
+router.post('/video', run(videoUploader), respond('videos', 'Video', 'application/octet-stream'));
+router.post('/document', run(documentUploader), respond('documents', 'Document', 'application/pdf'));
+router.post('/pdf', run(pdfUploader), respond('documents', 'PDF', 'application/pdf'));
 
 export default router;

@@ -57,6 +57,15 @@ app.use(
   })
 );
 
+// Old uploads (saved before Cloudinary) lived on the disk of the previous server. If a requested
+// /uploads file is NOT on this server, send the browser to the old server (only when LEGACY_UPLOADS_URL
+// is set) so old images keep working while all new uploads go to Cloudinary.
+app.use('/uploads', (req, res, next) => {
+  const legacy = (process.env.LEGACY_UPLOADS_URL || '').replace(/\/+$/, '');
+  if (!legacy || req.method !== 'GET') return next();
+  return res.redirect(302, `${legacy}/uploads${req.url}`);
+});
+
 // ── Health endpoint (Zero DB network transfer by default for keepalive & uptime checks) ──
 app.get('/api/health', async (req, res) => {
   // If ?diagnostics=true is explicitly requested by admin, run deep DB checks
