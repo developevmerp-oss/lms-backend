@@ -113,8 +113,15 @@ export const offloadDataUrls = async (req: Request, res: Response, next: NextFun
  * pushed there, the local copy is deleted, and the https URL is returned.
  * Returns null when Cloudinary is not configured or the upload fails -> caller keeps the local path.
  */
-export const offloadLocalFile = async (filePath: string, mime: string): Promise<string | null> => {
-  if (!isMediaOffloadConfigured()) return null;
+export const offloadLocalFile = async (
+  filePath: string,
+  mime: string,
+  info: { error?: string } = {}
+): Promise<string | null> => {
+  if (!isMediaOffloadConfigured()) {
+    info.error = 'CLOUDINARY_* variables are missing in lms-backend/.env (or the backend was not restarted / is started from another folder)';
+    return null;
+  }
   const fs = await import('fs');
   try {
     let kind: Kind = 'raw';
@@ -129,7 +136,13 @@ export const offloadLocalFile = async (filePath: string, mime: string): Promise<
       .digest('hex');
 
     const form = new FormData();
-    form.append('file', await (fs as any).openAsBlob(filePath, { type: mime }), filePath.split(/[\/]/).pop());
+    // fs.openAsBlob only exists on Node >= 19.8 (streams from disk). On Node 18 it is undefined, which used to
+    // make every upload silently fall back to local disk, so read the file into a Blob instead.
+    const blob: Blob =
+      typeof (fs as any).openAsBlob === 'function'
+        ? await (fs as any).openAsBlob(filePath, { type: mime })
+        : new Blob([await fs.promises.readFile(filePath)], { type: mime });
+    form.append('file', blob, filePath.split(/[\\/]/).pop());
     form.append('api_key', apiKey() as string);
     form.append('timestamp', timestamp);
     form.append('folder', folder);
@@ -146,7 +159,8 @@ export const offloadLocalFile = async (filePath: string, mime: string): Promise<
     fs.unlink(filePath, () => {});
     return json.secure_url as string;
   } catch (err: any) {
-    console.warn('[Upload] Cloudinary offload failed, keeping local file:', err?.message);
+    info.error = err?.message || String(err);
+    console.warn('[Upload] Cloudinary offload failed, keeping local file:', info.error);
     return null;
   }
 };

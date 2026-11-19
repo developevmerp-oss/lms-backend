@@ -82,12 +82,15 @@ const respond = (folder: string, label: string, defaultMime: string) => async (r
     const file = firstFile(req);
     if (!file) return res.status(400).json({ message: `No ${label.toLowerCase()} file provided` });
 
-    const remoteUrl = await offloadLocalFile(file.path, file.mimetype || defaultMime);
+    const info: { error?: string } = {};
+    const remoteUrl = await offloadLocalFile(file.path, file.mimetype || defaultMime, info);
     return res.status(200).json({
       success: true,
       url: remoteUrl || `/uploads/${folder}/${file.filename}`,
       // 'cloudinary' = permanent link, 'local' = saved on THIS server's disk (Cloudinary keys missing or upload failed)
       storage: remoteUrl ? 'cloudinary' : 'local',
+      // Only present when the file stayed local: tells you exactly why Cloudinary was not used
+      ...(remoteUrl ? {} : { storageError: info.error }),
       message: `${label} uploaded successfully`,
     });
   } catch (error: any) {
