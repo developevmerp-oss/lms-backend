@@ -86,6 +86,8 @@ const respond = (folder: string, label: string, defaultMime: string) => async (r
     return res.status(200).json({
       success: true,
       url: remoteUrl || `/uploads/${folder}/${file.filename}`,
+      // 'cloudinary' = permanent link, 'local' = saved on THIS server's disk (Cloudinary keys missing or upload failed)
+      storage: remoteUrl ? 'cloudinary' : 'local',
       message: `${label} uploaded successfully`,
     });
   } catch (error: any) {

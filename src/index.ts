@@ -4,7 +4,7 @@ import { sequelize } from './config/database';
 import './models';
 import routes from './routes';
 import { startKeepAlive } from './config/keepAlive';
-import { offloadDataUrls } from './middleware/offloadDataUrls';
+import { offloadDataUrls, isMediaOffloadConfigured } from './middleware/offloadDataUrls';
 
 dotenv.config();
 
@@ -128,6 +128,12 @@ const startServer = async () => {
   // Start HTTP listener immediately so server is instantly ready
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
+    // Makes a missing .env obvious: .env is not in git, so every computer/server needs its own CLOUDINARY_* lines
+    console.log(
+      isMediaOffloadConfigured()
+        ? '☁️  [Media] Cloudinary uploads: ON (images, videos and documents are saved to Cloudinary)'
+        : '⚠️  [Media] Cloudinary uploads: OFF — files will be saved on this computer\'s disk and big base64 images go into the database. Add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET to lms-backend/.env and restart.'
+    );
     startKeepAlive();
   });
 
