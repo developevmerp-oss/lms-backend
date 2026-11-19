@@ -1,10 +1,10 @@
 import express from 'express';
-import cors from 'cors';
 import dotenv from 'dotenv';
 import { sequelize } from './config/database';
 import './models';
 import routes from './routes';
 import { startKeepAlive } from './config/keepAlive';
+import { offloadDataUrls } from './middleware/offloadDataUrls';
 
 dotenv.config();
 
@@ -30,6 +30,10 @@ app.use((req, res, next) => {
 // multipart/form-data with multer (which streams to disk, not through JSON).
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// Moves base64 images/PDFs/videos out of request bodies into Cloudinary BEFORE they reach the
+// database (no-op until CLOUDINARY_* env vars are set). See middleware/offloadDataUrls.ts
+app.use('/api', offloadDataUrls);
 
 import path from 'path';
 import fs from 'fs';

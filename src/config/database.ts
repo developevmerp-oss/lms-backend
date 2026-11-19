@@ -5,11 +5,11 @@ dotenv.config();
 
 // Neon.tech PostgreSQL connection — MUST use the pooler endpoint (-pooler. in hostname)
 // to reduce per-connection overhead and stay within free-tier network transfer limits.
-const rawDbUrl =
-  process.env.DATABASE_URL ||
-  process.env.DB_URL ||
-  process.env.POSTGRES_URL ||
-  'postgresql://neondb_owner:npg_oZLs6xSR9Kpz@ep-lively-scene-b4zxxfwb-pooler.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require';
+// SECURITY: never hard-code a connection string here (it ends up in git history).
+const rawDbUrl = process.env.DATABASE_URL || process.env.DB_URL || process.env.POSTGRES_URL;
+if (!rawDbUrl) {
+  throw new Error('DATABASE_URL is not set. Add it to .env (local) or the Render environment variables.');
+}
 
 // Strip channel_binding parameter because pg driver does not support it with PgBouncer connection poolers
 const dbUrl = rawDbUrl

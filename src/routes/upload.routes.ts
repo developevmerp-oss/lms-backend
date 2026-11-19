@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { offloadLocalFile } from '../middleware/offloadDataUrls';
 
 const router = Router();
 
@@ -30,13 +31,14 @@ const upload = multer({
 });
 
 // Direct Multipart Video Upload Endpoint
-router.post('/video', upload.single('video'), (req: any, res: any) => {
+router.post('/video', upload.single('video'), async (req: any, res: any) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No video file provided' });
     }
 
-    const relativePath = `/uploads/videos/${req.file.filename}`;
+    const remoteUrl = await offloadLocalFile(req.file.path, req.file.mimetype || 'application/octet-stream');
+    const relativePath = remoteUrl || `/uploads/videos/${req.file.filename}`;
     return res.status(200).json({
       success: true,
       url: relativePath,
@@ -73,13 +75,14 @@ const uploadPdf = multer({
 });
 
 // Direct Multipart PDF Upload Endpoint
-router.post('/pdf', uploadPdf.single('pdf'), (req: any, res: any) => {
+router.post('/pdf', uploadPdf.single('pdf'), async (req: any, res: any) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No PDF file provided' });
     }
 
-    const relativePath = `/uploads/documents/${req.file.filename}`;
+    const remoteUrl = await offloadLocalFile(req.file.path, req.file.mimetype || 'application/pdf');
+    const relativePath = remoteUrl || `/uploads/documents/${req.file.filename}`;
     return res.status(200).json({
       success: true,
       url: relativePath,
