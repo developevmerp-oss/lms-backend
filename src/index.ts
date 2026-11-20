@@ -1,10 +1,10 @@
 import express from 'express';
-import cors from 'cors';
 import dotenv from 'dotenv';
 import { sequelize } from './config/database';
 import './models';
 import routes from './routes';
 import { startKeepAlive } from './config/keepAlive';
+import { offloadDataUrls, isMediaOffloadConfigured } from './middleware/offloadDataUrls';
 
 dotenv.config();
 
@@ -31,6 +31,10 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
+// Moves base64 images/PDFs/videos out of request bodies into Cloudinary BEFORE they reach the
+// database (no-op until CLOUDINARY_* env vars are set). See middleware/offloadDataUrls.ts
+app.use('/api', offloadDataUrls);
+
 import path from 'path';
 import fs from 'fs';
 
@@ -52,6 +56,15 @@ app.use(
     },
   })
 );
+
+// Old uploads (saved before Cloudinary) lived on the disk of the previous server. If a requested
+// /uploads file is NOT on this server, send the browser to the old server (only when LEGACY_UPLOADS_URL
+// is set) so old images keep working while all new uploads go to Cloudinary.
+app.use('/uploads', (req, res, next) => {
+  const legacy = (process.env.LEGACY_UPLOADS_URL || '').replace(/\/+$/, '');
+  if (!legacy || req.method !== 'GET') return next();
+  return res.redirect(302, `${legacy}/uploads${req.url}`);
+});
 
 // ── Health endpoint (Zero DB network transfer by default for keepalive & uptime checks) ──
 app.get('/api/health', async (req, res) => {
@@ -115,6 +128,12 @@ const startServer = async () => {
   // Start HTTP listener immediately so server is instantly ready
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
+    // Makes a missing .env obvious: .env is not in git, so every computer/server needs its own CLOUDINARY_* lines
+    console.log(
+      isMediaOffloadConfigured()
+        ? '☁️  [Media] Cloudinary uploads: ON (images, videos and documents are saved to Cloudinary)'
+        : '⚠️  [Media] Cloudinary uploads: OFF — files will be saved on this computer\'s disk and big base64 images go into the database. Add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET to lms-backend/.env and restart.'
+    );
     startKeepAlive();
   });
 

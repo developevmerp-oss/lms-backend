@@ -7,13 +7,14 @@ export interface CommunityWinAttributes {
   achievement: string;
   image?: string | null;
   likes: number;
+  likedBy?: string[];
   comments?: Array<{ author: string; text: string }>;
   timeAgo: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-export interface CommunityWinCreationAttributes extends Optional<CommunityWinAttributes, 'id' | 'likes' | 'comments' | 'image'> {}
+export interface CommunityWinCreationAttributes extends Optional<CommunityWinAttributes, 'id' | 'likes' | 'likedBy' | 'comments' | 'image'> {}
 
 class CommunityWin extends Model<CommunityWinAttributes, CommunityWinCreationAttributes> implements CommunityWinAttributes {
   public id!: string;
@@ -21,6 +22,7 @@ class CommunityWin extends Model<CommunityWinAttributes, CommunityWinCreationAtt
   public achievement!: string;
   public image!: string | null;
   public likes!: number;
+  public likedBy!: string[];
   public comments!: Array<{ author: string; text: string }>;
   public timeAgo!: string;
   public readonly createdAt!: Date;
@@ -50,6 +52,11 @@ CommunityWin.init(
     likes: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
+    },
+    // ids of the users who liked this post (one like per user)
+    likedBy: {
+      type: DataTypes.JSONB,
+      defaultValue: [],
     },
     comments: {
       type: DataTypes.JSON,

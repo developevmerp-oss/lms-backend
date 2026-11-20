@@ -1,10 +1,22 @@
 import { Request, Response } from 'express';
 import db from '../models';
+import { sequelize } from '../config/database';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { processStudentStreakAndWeekStatus } from '../utils/streakHelper';
 import { canEarnXp } from '../utils/xpHelper';
 
 const { User, Course, Submission, Skill, Badge, Portfolio, Milestone, SalesRecord, Notification } = db;
+
+
+// Turns a CommunityWin row into the JSON sent to the browser:
+// hides the list of user ids and adds `likedByMe` for the logged-in user.
+const serializeWin = (win: any, userId?: string) => {
+  const json = typeof win?.toJSON === 'function' ? win.toJSON() : { ...win };
+  const likedBy: string[] = Array.isArray(json.likedBy) ? json.likedBy : [];
+  json.likedByMe = Boolean(userId) && likedBy.includes(userId as string);
+  delete json.likedBy;
+  return json;
+};
 
 // In-memory cache for level tiers
 let cachedLevelTiers: any[] | null = null;
@@ -58,7 +70,7 @@ export const getStudentStats = async (req: AuthRequest, res: Response): Promise<
     if (!studentId) return res.status(401).json({ message: 'Unauthorized' });
 
     // Fire all independent queries in PARALLEL
-    const [student, allCourses, communityWins, levelTiers] = await Promise.all([
+    const [student, allCourses, communityWins, levelTiers, notifications] = await Promise.all([
       User.findByPk(studentId, {
         attributes: { exclude: ['password'] },
         include: [
@@ -75,12 +87,18 @@ export const getStudentStats = async (req: AuthRequest, res: Response): Promise<
               attributes: ['id', 'status', 'progress', 'enrolledAt', 'expiresAt', 'validityMonths'],
             },
           },
-          { model: Notification, as: 'notifications', attributes: ['id', 'title', 'message', 'type', 'link', 'isRead', 'createdAt'] },
         ]
       }),
       Course.findAll({ attributes: ['id', 'title', 'description', 'image', 'flyerImage'] }),
       db.CommunityWin.findAll({ order: [['createdAt', 'DESC']], limit: 5 }),
       getLevelTiers(),
+      // Only the latest 30 notifications (was: EVERY notification ever sent, on every page load)
+      Notification.findAll({
+        where: { userId: studentId },
+        attributes: ['id', 'title', 'message', 'type', 'link', 'isRead', 'createdAt'],
+        order: [['createdAt', 'DESC']],
+        limit: 30,
+      }),
     ]);
 
     if (!student) return res.status(404).json({ message: 'Student not found' });
@@ -135,9 +153,9 @@ export const getStudentStats = async (req: AuthRequest, res: Response): Promise<
       milestones: student.milestones,
       salesRecords: student.salesRecords,
       courses: (student as any).courses,
-      notifications: (student as any).notifications,
+      notifications,
       allCourses,
-      communityWins,
+      communityWins: communityWins.map((w: any) => serializeWin(w, studentId)),
       nextGoal
     });
   } catch (error) {
@@ -159,11 +177,31 @@ export const getPublicLevelTiers = async (req: Request, res: Response): Promise<
 export const likeCommunityWin = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const { id } = req.params;
-    const win = await db.CommunityWin.findByPk(id);
-    if (!win) return res.status(404).json({ message: 'Win not found' });
-    win.likes += 1;
-    await win.save();
-    return res.status(200).json(win);
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+    // Toggle: first click = like, second click by the SAME user = unlike. One like per user.
+    // The row is locked inside a transaction so rapid double-clicks cannot count twice.
+    const result = await sequelize.transaction(async (t) => {
+      const win = await db.CommunityWin.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
+      if (!win) return null;
+      const likedBy: string[] = Array.isArray(win.likedBy) ? [...win.likedBy] : [];
+      const index = likedBy.indexOf(userId);
+      if (index === -1) {
+        likedBy.push(userId);
+        win.likes = (win.likes || 0) + 1;
+      } else {
+        likedBy.splice(index, 1);
+        win.likes = Math.max(0, (win.likes || 0) - 1);
+      }
+      win.likedBy = likedBy;
+      win.changed('likedBy', true);
+      await win.save({ transaction: t });
+      return win;
+    });
+
+    if (!result) return res.status(404).json({ message: 'Win not found' });
+    return res.status(200).json(serializeWin(result, userId));
   } catch (error) {
     console.error('Error liking win:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -174,10 +212,10 @@ export const commentCommunityWin = async (req: AuthRequest, res: Response): Prom
   try {
     const { id } = req.params;
     const { text } = req.body;
-    const authorName = (req.user as any)?.name || 'Student';
     if (!text) return res.status(400).json({ message: 'Comment text is required' });
 
     const student = await User.findByPk(req.user?.id);
+    const authorName = student?.name || 'Student';
     const studentLevel = (student?.membershipLevel || 'GENERAL').toUpperCase();
     if (studentLevel === 'GENERAL' || studentLevel === 'L0') {
       return res.status(403).json({
@@ -189,7 +227,7 @@ export const commentCommunityWin = async (req: AuthRequest, res: Response): Prom
     if (!win) return res.status(404).json({ message: 'Win not found' });
     win.comments = [...(win.comments || []), { author: authorName, text }];
     await win.save();
-    return res.status(200).json(win);
+    return res.status(200).json(serializeWin(win, req.user?.id));
   } catch (error) {
     console.error('Error commenting win:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -200,10 +238,11 @@ export const postCommunityWin = async (req: AuthRequest, res: Response): Promise
   try {
     const { achievement, title, salesAmount, technique, imageUrl, image } = req.body;
     const studentId = req.user?.id;
-    const studentName = (req.user as any)?.name || 'Student';
     if (!achievement && !title) return res.status(400).json({ message: 'Achievement text is required' });
 
     const student = await User.findByPk(studentId);
+    // The login token only holds id + role, so the real name must come from the database
+    const studentName = student?.name || 'Student';
     const studentLevel = (student?.membershipLevel || 'GENERAL').toUpperCase();
     if (studentLevel === 'GENERAL' || studentLevel === 'L0') {
       return res.status(403).json({
@@ -393,8 +432,9 @@ export const getCommunityWins = async (req: Request, res: Response): Promise<any
       offset,
     });
 
+    const meId = (req as AuthRequest).user?.id;
     return res.status(200).json({
-      data: wins,
+      data: wins.map((w: any) => serializeWin(w, meId)),
       total: count,
       page,
       totalPages: Math.ceil(count / limit),
