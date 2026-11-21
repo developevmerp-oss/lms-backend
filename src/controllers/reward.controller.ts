@@ -83,21 +83,26 @@ export const redeemReward = async (req: AuthRequest, res: Response): Promise<any
       });
     }
 
-    const currentPoints = student.xpPoints !== undefined ? student.xpPoints : (student.points || 0);
+    const currentPoints = Math.max(
+      student.xpPoints !== undefined && student.xpPoints !== null ? Number(student.xpPoints) : 0,
+      student.points !== undefined && student.points !== null ? Number(student.points) : 0
+    );
+
     if (currentPoints < reward.pointCost) {
       return res.status(400).json({ message: `Not enough XP points to redeem this reward. You need ${reward.pointCost - currentPoints} more XP!` });
     }
 
-    // Deduct points safely
-    student.points = Math.max(0, (student.points || 0) - reward.pointCost);
-    student.xpPoints = Math.max(0, (student.xpPoints || 0) - reward.pointCost);
+    // Deduct points safely and keep both points and xpPoints synchronized
+    const remainingPoints = Math.max(0, currentPoints - reward.pointCost);
+    student.points = remainingPoints;
+    student.xpPoints = remainingPoints;
     await student.save();
 
     return res.status(200).json({
       success: true,
       message: `🎉 Reward "${reward.title}" redeemed successfully! Team Ravishing Art Hub will contact you shortly.`,
       reward,
-      newPoints: student.xpPoints,
+      newPoints: remainingPoints,
     });
   } catch (error) {
     console.error('Error redeeming reward:', error);
