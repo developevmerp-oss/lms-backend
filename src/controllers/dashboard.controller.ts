@@ -135,9 +135,22 @@ export const getStudentStats = async (req: AuthRequest, res: Response): Promise<
     // Process streak reset and calculate current week status
     const { streak: calculatedStreak, weekStatus } = await processStudentStreakAndWeekStatus(student);
 
+    // Calculate unified effective points to prevent points / xpPoints desync
+    const effectivePoints = Math.max(
+      student.points !== undefined && student.points !== null ? Number(student.points) : 0,
+      student.xpPoints !== undefined && student.xpPoints !== null ? Number(student.xpPoints) : 0
+    );
+
+    // Auto-sync database record if they were out of sync
+    if (student.points !== effectivePoints || student.xpPoints !== effectivePoints) {
+      student.points = effectivePoints;
+      student.xpPoints = effectivePoints;
+      student.save().catch((err: any) => console.error('Failed to auto-sync student points in dashboard:', err));
+    }
+
     res.status(200).json({
-      points: student.points,
-      xpPoints: student.xpPoints,
+      points: effectivePoints,
+      xpPoints: effectivePoints,
       streak: calculatedStreak,
       weekStatus,
       membershipLevel: student.membershipLevel || currentTier?.name || 'GENERAL',

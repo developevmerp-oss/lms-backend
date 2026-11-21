@@ -122,10 +122,24 @@ export const updateStudent = async (req: AuthRequest, res: Response): Promise<an
       else if (upper === 'L3+') updatedRank = 'Masters Club';
     }
 
+    // Keep points and xpPoints synchronized if either one is updated
+    let targetPoints = student.points;
+    let targetXpPoints = student.xpPoints;
+    if (points !== undefined && xpPoints !== undefined) {
+      targetPoints = points;
+      targetXpPoints = xpPoints;
+    } else if (points !== undefined) {
+      targetPoints = points;
+      targetXpPoints = points;
+    } else if (xpPoints !== undefined) {
+      targetPoints = xpPoints;
+      targetXpPoints = xpPoints;
+    }
+
     await student.update({
       name: name !== undefined ? name : student.name,
-      points: points !== undefined ? points : student.points,
-      xpPoints: xpPoints !== undefined ? xpPoints : student.xpPoints,
+      points: targetPoints,
+      xpPoints: targetXpPoints,
       streak: streak !== undefined ? streak : student.streak,
       membershipLevel: membershipLevel !== undefined ? membershipLevel : student.membershipLevel,
       rank: updatedRank,
