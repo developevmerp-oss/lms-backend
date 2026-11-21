@@ -12,7 +12,8 @@ import {
   completeDailyRoutine,
   addStudentSalesRecord,
   deleteStudentSalesRecord,
-  getPublicEventsList
+  getPublicEventsList,
+  markNotificationsAsSeen
 } from '../controllers/dashboard.controller';
 import { getActiveOffers } from '../controllers/offer.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
@@ -52,5 +53,10 @@ router.get('/community-wins', authenticate, getCommunityWins);
 router.post('/community-wins', authenticate, postCommunityWin);
 router.post('/community-wins/:id/like', authenticate, likeCommunityWin);
 router.post('/community-wins/:id/comment', authenticate, commentCommunityWin);
+
+// Notification seen/read routes (Student)
+router.post('/notifications/mark-seen', authenticate, markNotificationsAsSeen);
+router.post('/notifications/mark-read', authenticate, markNotificationsAsSeen);
+router.patch('/notifications/:id/seen', authenticate, markNotificationsAsSeen);
 
 export default router;

@@ -14,7 +14,14 @@ export const getAllCertificates = async (req: Request, res: Response): Promise<a
       ],
       order: [['createdAt', 'DESC']]
     });
-    res.status(200).json(certificates);
+    const mapped = certificates.map((c: any) => {
+      const plain = c.toJSON();
+      if (!plain.pdfUrl && plain.certificateUrl) {
+        plain.pdfUrl = plain.certificateUrl;
+      }
+      return plain;
+    });
+    res.status(200).json(mapped);
   } catch (error) {
     console.error('Error fetching certificates:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -32,7 +39,14 @@ export const getMyCertificates = async (req: AuthRequest, res: Response): Promis
       ],
       order: [['createdAt', 'DESC']]
     });
-    res.status(200).json(certificates);
+    const mapped = certificates.map((c: any) => {
+      const plain = c.toJSON();
+      if (!plain.pdfUrl && plain.certificateUrl) {
+        plain.pdfUrl = plain.certificateUrl;
+      }
+      return plain;
+    });
+    res.status(200).json(mapped);
   } catch (error) {
     console.error('Error fetching my certificates:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -42,14 +56,27 @@ export const getMyCertificates = async (req: AuthRequest, res: Response): Promis
 // Award a certificate (Admin)
 export const awardCertificate = async (req: Request, res: Response): Promise<any> => {
   try {
-    const { studentId, courseId, pdfUrl } = req.body;
+    const { studentId, courseId, pdfUrl, certificateUrl, title } = req.body;
     
-    // Create the certificate
-    const certificate = await Certificate.create({ studentId, courseId, pdfUrl });
+    if (!studentId || !courseId) {
+      return res.status(400).json({ message: 'studentId and courseId are required' });
+    }
+
+    const course = await Course.findByPk(courseId);
+    const certTitle = title || (course ? `${course.title} Completion Certificate` : 'Course Completion Certificate');
+    const finalUrl = pdfUrl || certificateUrl || 'https://res.cloudinary.com/dummy/certificates/default.pdf';
+
+    // Create the certificate with required title and certificateUrl
+    const certificate = await Certificate.create({
+      studentId,
+      courseId,
+      title: certTitle,
+      certificateUrl: finalUrl,
+    });
     
     res.status(201).json({ message: 'Certificate awarded', certificate });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error awarding certificate:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: error?.message });
   }
 };

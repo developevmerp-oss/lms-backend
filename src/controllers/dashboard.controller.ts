@@ -226,6 +226,7 @@ export const commentCommunityWin = async (req: AuthRequest, res: Response): Prom
     const win = await db.CommunityWin.findByPk(id);
     if (!win) return res.status(404).json({ message: 'Win not found' });
     win.comments = [...(win.comments || []), { author: authorName, text }];
+    win.changed('comments', true);
     await win.save();
     return res.status(200).json(serializeWin(win, req.user?.id));
   } catch (error) {
@@ -483,6 +484,24 @@ export const getPublicCourses = async (req: Request, res: Response): Promise<any
     return res.status(200).json(courses);
   } catch (error) {
     console.error('Error fetching public courses:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// POST / PATCH: Mark notifications as seen/read (Student)
+export const markNotificationsAsSeen = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const studentId = req.user?.id;
+    if (!studentId) return res.status(401).json({ message: 'Unauthorized' });
+    const { notificationId } = req.body || {};
+    if (notificationId) {
+      await Notification.update({ isRead: true }, { where: { id: notificationId, userId: studentId } });
+    } else {
+      await Notification.update({ isRead: true }, { where: { userId: studentId, isRead: false } });
+    }
+    return res.status(200).json({ success: true, message: 'Notifications marked as seen' });
+  } catch (error) {
+    console.error('Error marking notifications seen:', error);
     return res.status(500).json({ message: 'Internal server error' });
   }
 };
