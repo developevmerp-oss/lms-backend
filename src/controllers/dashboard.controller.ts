@@ -269,6 +269,7 @@ export const postCommunityWin = async (req: AuthRequest, res: Response): Promise
     if (technique) fullAchievement += ` • Technique: ${technique}`;
 
     const win = await db.CommunityWin.create({
+      userId: studentId,
       studentName,
       achievement: fullAchievement,
       likes: 0,
@@ -298,7 +299,7 @@ export const postCommunityWin = async (req: AuthRequest, res: Response): Promise
 
     return res.status(201).json({
       success: true,
-      win,
+      win: serializeWin(win, studentId),
       awardedXp,
       updatedPoints,
       message: awardedXp > 0 ? `🎉 +${awardedXp} XP Awarded for sharing your win!` : 'Post published to Community Feed successfully!'
@@ -306,6 +307,82 @@ export const postCommunityWin = async (req: AuthRequest, res: Response): Promise
   } catch (error) {
     console.error('Error creating community win:', error);
     res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Student / Author: Edit Own Community Win
+export const updateCommunityWin = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { id } = req.params;
+    const studentId = req.user?.id;
+    const userRole = req.user?.role;
+    const { achievement, title, salesAmount, technique, imageUrl, image } = req.body;
+
+    const win = await db.CommunityWin.findByPk(id);
+    if (!win) return res.status(404).json({ message: 'Post not found' });
+
+    const student = await User.findByPk(studentId);
+    const isOwner = (win.userId && win.userId === studentId) ||
+                    (student && win.studentName && win.studentName.trim().toLowerCase() === student.name.trim().toLowerCase());
+    const isAdmin = userRole === 'admin';
+
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ message: 'You can only edit your own posts' });
+    }
+
+    let baseText = (achievement || title || win.achievement || '')
+      .replace(/\s*\([₹rRsS\.]*[\d,]+\s+sale!\)/gi, '')
+      .replace(/\s*•\s*Technique:\s*[^•\n]+/gi, '')
+      .trim();
+
+    let fullAchievement = baseText;
+    if (salesAmount) {
+      fullAchievement += ` (₹${Number(salesAmount).toLocaleString()} sale!)`;
+    }
+    if (technique) {
+      fullAchievement += ` • Technique: ${technique}`;
+    }
+
+    await win.update({
+      achievement: fullAchievement,
+      image: imageUrl !== undefined ? imageUrl : (image !== undefined ? image : win.image),
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Post updated successfully!',
+      win: serializeWin(win, studentId),
+    });
+  } catch (error) {
+    console.error('Error updating community win:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Student / Author: Delete Own Community Win
+export const deleteStudentCommunityWin = async (req: AuthRequest, res: Response): Promise<any> => {
+  try {
+    const { id } = req.params;
+    const studentId = req.user?.id;
+    const userRole = req.user?.role;
+
+    const win = await db.CommunityWin.findByPk(id);
+    if (!win) return res.status(404).json({ message: 'Post not found' });
+
+    const student = await User.findByPk(studentId);
+    const isOwner = (win.userId && win.userId === studentId) ||
+                    (student && win.studentName && win.studentName.trim().toLowerCase() === student.name.trim().toLowerCase());
+    const isAdmin = userRole === 'admin';
+
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ message: 'You can only delete your own posts' });
+    }
+
+    await win.destroy();
+    return res.status(200).json({ success: true, message: 'Post deleted successfully!' });
+  } catch (error) {
+    console.error('Error deleting community win:', error);
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
 
