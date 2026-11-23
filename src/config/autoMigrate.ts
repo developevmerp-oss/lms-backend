@@ -213,6 +213,7 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
     `ALTER TABLE "Rewards" ALTER COLUMN "imageUrl" TYPE TEXT;`,
 
     // --- COMMUNITY WINS TABLE ---
+    `ALTER TABLE "CommunityWins" ADD COLUMN IF NOT EXISTS "userId" UUID;`,
     `ALTER TABLE "CommunityWins" ADD COLUMN IF NOT EXISTS "comments" JSONB DEFAULT '[]'::jsonb;`,
     `ALTER TABLE "CommunityWins" ADD COLUMN IF NOT EXISTS "likes" INTEGER DEFAULT 0;`,
     `ALTER TABLE "CommunityWins" ADD COLUMN IF NOT EXISTS "likedBy" JSONB DEFAULT '[]'::jsonb;`,

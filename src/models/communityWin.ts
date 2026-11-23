@@ -3,6 +3,7 @@ import { sequelize } from '../config/database';
 
 export interface CommunityWinAttributes {
   id: string;
+  userId?: string | null;
   studentName: string;
   achievement: string;
   image?: string | null;
@@ -14,10 +15,11 @@ export interface CommunityWinAttributes {
   updatedAt?: Date;
 }
 
-export interface CommunityWinCreationAttributes extends Optional<CommunityWinAttributes, 'id' | 'likes' | 'likedBy' | 'comments' | 'image'> {}
+export interface CommunityWinCreationAttributes extends Optional<CommunityWinAttributes, 'id' | 'userId' | 'likes' | 'likedBy' | 'comments' | 'image'> {}
 
 class CommunityWin extends Model<CommunityWinAttributes, CommunityWinCreationAttributes> implements CommunityWinAttributes {
   public id!: string;
+  public userId!: string | null;
   public studentName!: string;
   public achievement!: string;
   public image!: string | null;
@@ -36,6 +38,10 @@ CommunityWin.init(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
       allowNull: false,
+    },
+    userId: {
+      type: DataTypes.UUID,
+      allowNull: true,
     },
     studentName: {
       type: DataTypes.STRING,
