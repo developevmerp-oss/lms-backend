@@ -3,6 +3,8 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { offloadLocalFile } from '../middleware/offloadDataUrls';
+import { authenticate } from '../middleware/auth.middleware';
+import { deleteUnusedMediaNow } from '../utils/cloudinaryCleanup';
 
 /**
  * Upload endpoints (multipart/form-data). When CLOUDINARY_* is configured every file is pushed to
@@ -97,6 +99,20 @@ const respond = (folder: string, label: string, defaultMime: string) => async (r
     return res.status(500).json({ message: error.message || `${label} upload failed` });
   }
 };
+
+// DELETE /api/upload  body: { "url": "<cloudinary link>" }
+// Used by the forms when someone uploads a file and then removes / replaces it BEFORE saving, so the
+// unsaved file does not stay in Cloudinary. Never deletes a file that a database row still uses.
+router.delete('/', authenticate, async (req: any, res: any) => {
+  try {
+    const url = req.body?.url || req.query?.url;
+    if (!url) return res.status(400).json({ message: 'url is required' });
+    const result = await deleteUnusedMediaNow(url);
+    return res.status(200).json({ success: true, result });
+  } catch (error: any) {
+    return res.status(500).json({ message: error.message || 'Could not delete the file' });
+  }
+});
 
 router.post('/image', run(imageUploader), respond('images', 'Image', 'image/png'));
 router.post('/video', run(videoUploader), respond('videos', 'Video', 'application/octet-stream'));
