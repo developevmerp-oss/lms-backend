@@ -1,4 +1,5 @@
 import { Sequelize } from 'sequelize';
+import crypto from 'crypto';
 
 /**
  * Runs safe automatic database migrations on backend server startup.
@@ -407,7 +408,109 @@ export const runAutoMigrations = async (sequelize: Sequelize) => {
     } catch (_) {}
 
     console.log('✅ Auto-migrations and seeders completed successfully.');
+
+    // Asynchronously check and migrate any remaining Base64 media to Cloudinary in the background
+    autoMigrateBase64Media(sequelize).catch((e) =>
+      console.warn('⚠️ [Auto-Migrate Media Note]:', e?.message)
+    );
   } catch (err: any) {
     console.warn('⚠️ Auto-migration note:', err?.message);
+  }
+};
+
+/**
+ * Automatically inspects the database ONCE after deploy and migrates any remaining Base64 media to Cloudinary.
+ * Recorded in "AppMigrations" table so it NEVER runs again on subsequent restarts or pings.
+ */
+export const autoMigrateBase64Media = async (sequelize: Sequelize) => {
+  const cloud = process.env.CLOUDINARY_CLOUD_NAME;
+  const key = process.env.CLOUDINARY_API_KEY;
+  const secret = process.env.CLOUDINARY_API_SECRET;
+
+  if (!cloud || !key || !secret) {
+    return;
+  }
+
+  const MIGRATION_KEY = 'migrate_base64_to_cloudinary_v1';
+
+  try {
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS "AppMigrations" (
+        "name" VARCHAR(255) PRIMARY KEY,
+        "appliedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+
+    const [alreadyApplied]: any = await sequelize.query(
+      `SELECT 1 FROM "AppMigrations" WHERE "name" = :key LIMIT 1;`,
+      { replacements: { key: MIGRATION_KEY } }
+    );
+
+    if (Array.isArray(alreadyApplied) && alreadyApplied.length > 0) {
+      // Already run once on this database — SKIP completely, never run again
+      return;
+    }
+  } catch (err: any) {
+    console.warn('[Migration Check Note]:', err.message);
+  }
+
+  console.log('🔄 [One-Time Deploy Migration] Checking and migrating legacy Base64 media to Cloudinary...');
+
+  const targets = [
+    { table: 'Courses', column: 'image', kind: 'image', folder: 'lms/courses' },
+    { table: 'Courses', column: 'flyerImage', kind: 'image', folder: 'lms/flyers' },
+    { table: 'LevelTiers', column: 'thumbnail', kind: 'image', folder: 'lms/levels' },
+    { table: 'Users', column: 'avatarUrl', kind: 'image', folder: 'lms/avatars' },
+    { table: 'Rewards', column: 'imageUrl', kind: 'image', folder: 'lms/rewards' },
+    { table: 'Portfolios', column: 'imageUrl', kind: 'image', folder: 'lms/portfolios' },
+    { table: 'CommunityWins', column: 'image', kind: 'image', folder: 'lms/community' },
+  ];
+
+  let totalMigrated = 0;
+
+  for (const t of targets) {
+    try {
+      const [rows]: any = await sequelize.query(
+        `SELECT id, "${t.column}" as val FROM "${t.table}" WHERE "${t.column}" LIKE 'data:%' LIMIT 50;`
+      );
+      if (Array.isArray(rows) && rows.length > 0) {
+        console.log(`[Auto-Migrate] Found ${rows.length} Base64 records in ${t.table}.${t.column}. Migrating to Cloudinary...`);
+        for (const r of rows) {
+          if (!r.val || !r.val.startsWith('data:')) continue;
+          try {
+            const timestamp = Math.floor(Date.now() / 1000).toString();
+            const signature = crypto.createHash('sha1').update(`folder=${t.folder}&timestamp=${timestamp}${secret}`).digest('hex');
+            const form = new FormData();
+            form.append('file', r.val);
+            form.append('api_key', key);
+            form.append('timestamp', timestamp);
+            form.append('folder', t.folder);
+            form.append('signature', signature);
+            const res = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/${t.kind}/upload`, { method: 'POST', body: form });
+            const json: any = await res.json().catch(() => ({}));
+            if (res.ok && json.secure_url) {
+              await sequelize.query(`UPDATE "${t.table}" SET "${t.column}" = :url WHERE id = :id`, {
+                replacements: { url: json.secure_url, id: r.id }
+              });
+              totalMigrated++;
+              console.log(`[Auto-Migrate] ✅ ${t.table}.${t.column} ID ${r.id} -> ${json.secure_url}`);
+            }
+          } catch (err: any) {
+            console.warn(`[Auto-Migrate] ⚠️ Failed for ID ${r.id}:`, err.message);
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  // Mark migration as completed permanently so it NEVER executes again on this DB
+  try {
+    await sequelize.query(
+      `INSERT INTO "AppMigrations" ("name") VALUES (:key) ON CONFLICT ("name") DO NOTHING;`,
+      { replacements: { key: MIGRATION_KEY } }
+    );
+    console.log(`[Auto-Migrate] ✅ One-time media migration completed (${totalMigrated} items migrated) and locked in AppMigrations.`);
+  } catch (err: any) {
+    console.warn('[Auto-Migrate Lock Note]:', err.message);
   }
 };
