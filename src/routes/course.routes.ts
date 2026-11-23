@@ -11,12 +11,13 @@ import {
   triggerSeedCourses
 } from '../controllers/course.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
+import { cachePublic } from '../middleware/publicCache';
 
 const router = Router();
 
-// Everyone (public / authenticated) can get courses
-router.get('/', getCourses);
-router.get('/:id', getCourseById);
+// Everyone (public / authenticated) can get courses (cached 2 min in-memory to preserve DB quota)
+router.get('/', cachePublic(120), getCourses);
+router.get('/:id', cachePublic(120), getCourseById);
 
 // Admin course management
 router.post('/seed', authenticate, authorize(['admin']), triggerSeedCourses);
