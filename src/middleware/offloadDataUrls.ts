@@ -94,10 +94,29 @@ const walk = async (node: any, depth: number): Promise<any> => {
   return node;
 };
 
+// True if any string in the body is a large data: URL (a file that would be stored as base64 in the database)
+const hasLargeDataUrl = (node: any, depth = 0): boolean => {
+  if (depth > MAX_DEPTH || node === null || node === undefined) return false;
+  if (typeof node === 'string') return node.length >= MIN_DATA_URL_LENGTH && node.startsWith('data:');
+  if (Array.isArray(node)) return node.some((n) => hasLargeDataUrl(n, depth + 1));
+  if (typeof node === 'object') return Object.values(node).some((v) => hasLargeDataUrl(v, depth + 1));
+  return false;
+};
+
 export const offloadDataUrls = async (req: Request, res: Response, next: NextFunction) => {
-  if (!isMediaOffloadConfigured()) return next();
   if (!['POST', 'PUT', 'PATCH'].includes(req.method)) return next();
   if (!req.body || typeof req.body !== 'object') return next();
+
+  if (!isMediaOffloadConfigured()) {
+    // Safety switch for production: set BLOCK_BASE64_STORAGE=true on Render so a server that is missing the
+    // Cloudinary keys can never write big base64 files into the database (the cause of the full database).
+    if (process.env.BLOCK_BASE64_STORAGE === 'true' && hasLargeDataUrl(req.body)) {
+      return res.status(503).json({
+        message: 'File storage is not configured on this server (Cloudinary keys missing), so the upload was refused to protect the database.',
+      });
+    }
+    return next();
+  }
 
   try {
     req.body = await walk(req.body, 0);

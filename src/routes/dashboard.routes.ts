@@ -17,20 +17,22 @@ import {
 } from '../controllers/dashboard.controller';
 import { getActiveOffers } from '../controllers/offer.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
+import { cachePublic } from '../middleware/publicCache';
 
 const router = Router();
 
 // Public / Student active level offers route
-router.get('/offers', getActiveOffers);
+// (public routes are cached in memory for a short time to protect the free Neon network quota)
+router.get('/offers', cachePublic(60), getActiveOffers);
 
 // Public / Student levels route
-router.get('/levels', getPublicLevelTiers);
+router.get('/levels', cachePublic(120), getPublicLevelTiers);
 
 // Public / Student courses route (For landing page level progression)
-router.get('/courses', getPublicCourses);
+router.get('/courses', cachePublic(300), getPublicCourses);
 
 // Public / Student events list route
-router.get('/events', getPublicEventsList);
+router.get('/events', cachePublic(120), getPublicEventsList);
 
 // Public / Student badges route
 router.get('/badges', authenticate, getPublicBadges);

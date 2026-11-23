@@ -7,11 +7,12 @@ import {
   toggleTrackingStatus,
 } from '../controllers/marketingTracking.controller';
 import { authenticate, requireAdmin } from '../middleware/auth.middleware';
+import { cachePublic } from '../middleware/publicCache';
 
 const router = Router();
 
 // ── Public Endpoint (Used by React Frontend MetaPixelProvider) ──
-router.get('/config', getPublicTrackingConfig);
+router.get('/config', cachePublic(300), getPublicTrackingConfig);
 
 // ── Admin Protected Endpoints ──
 router.get('/admin', authenticate, requireAdmin, getAdminTrackingSettings);

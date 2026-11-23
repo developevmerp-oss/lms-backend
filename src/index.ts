@@ -1,12 +1,18 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import { sequelize } from './config/database';
-import './models';
+import db from './models';
+import { registerMediaCleanupHooks } from './utils/cloudinaryCleanup';
 import routes from './routes';
 import { startKeepAlive } from './config/keepAlive';
 import { offloadDataUrls, isMediaOffloadConfigured } from './middleware/offloadDataUrls';
+import { logHeavyResponses, clearCacheOnWrite } from './middleware/publicCache';
 
 dotenv.config();
+
+// When an image / video / document is replaced or its record is deleted, delete the old file from
+// Cloudinary too so the Cloudinary storage does not fill up (see utils/cloudinaryCleanup.ts)
+registerMediaCleanupHooks(db);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -34,6 +40,10 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 // Moves base64 images/PDFs/videos out of request bodies into Cloudinary BEFORE they reach the
 // database (no-op until CLOUDINARY_* env vars are set). See middleware/offloadDataUrls.ts
 app.use('/api', offloadDataUrls);
+
+// Protects the free Neon network quota: logs any response over ~300 KB, and empties the short-lived
+// public-endpoint cache after every successful write (see middleware/publicCache.ts)
+app.use('/api', logHeavyResponses, clearCacheOnWrite);
 
 import path from 'path';
 import fs from 'fs';
