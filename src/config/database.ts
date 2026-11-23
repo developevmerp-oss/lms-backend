@@ -45,15 +45,15 @@ export const sequelize = new Sequelize(dbUrl, {
     schema: 'public',
   },
 
-  // ── Connection Pool ──
-  // Keeping min: 1 ensures at least 1 connection stays warm and ready, eliminating
-  // the 3-5 second SSL/TCP handshake delay on every API call.
+  // ── Connection Pool for Neon Serverless ──
+  // Setting min: 0 allows idle connections to close after 10 seconds of inactivity.
+  // This enables Neon to scale to 0 (sleep), preventing exhaustion of the 100 free monthly compute hours.
   pool: {
     max: 5,        // Max simultaneous DB connections
-    min: 1,        // Keep 1 warm connection ready so queries execute immediately
+    min: 0,        // Drops to 0 when idle so Neon can sleep and preserve compute quota
     acquire: 30000, // Max ms to wait for a connection before throwing an error
-    idle: 120000,  // Keep idle connections open for 2 minutes (instead of 10s)
-    evict: 30000,  // Eviction check every 30s
+    idle: 10000,   // Close connection after 10 seconds of no traffic
+    evict: 5000,   // Check eviction every 5s
   },
 
   dialectOptions: {
