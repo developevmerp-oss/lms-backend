@@ -5,6 +5,8 @@ import {
   likeCommunityWin,
   commentCommunityWin,
   postCommunityWin,
+  updateCommunityWin,
+  deleteStudentCommunityWin,
   getCommunityWins,
   getPublicBadges,
   getPublicCourses,
@@ -53,6 +55,8 @@ router.post('/student/routine', authenticate, completeDailyRoutine);
 // Community Win routes (Student / Authenticated users)
 router.get('/community-wins', authenticate, getCommunityWins);
 router.post('/community-wins', authenticate, postCommunityWin);
+router.put('/community-wins/:id', authenticate, updateCommunityWin);
+router.delete('/community-wins/:id', authenticate, deleteStudentCommunityWin);
 router.post('/community-wins/:id/like', authenticate, likeCommunityWin);
 router.post('/community-wins/:id/comment', authenticate, commentCommunityWin);
 

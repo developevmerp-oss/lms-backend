@@ -894,32 +894,63 @@ export const broadcastNotification = async (req: AuthRequest, res: Response): Pr
         where: { role: 'student' },
         attributes: ['id'],
       });
-    } else if (['L0', 'L1', 'L2', 'L3'].includes(targetAudience)) {
-      if (targetAudience === 'L0') {
-        targetUsers = await User.findAll({
-          where: {
-            role: 'student',
-            [Op.or]: [
-              { membershipLevel: 'L0' },
-              { membershipLevel: { [Op.iLike]: '%L0%' } },
-            ],
-          },
-          attributes: ['id'],
-        });
-      } else {
-        targetUsers = await User.findAll({
-          where: {
-            role: 'student',
-            [Op.or]: [
-              { membershipLevel: targetAudience },
-              { membershipLevel: { [Op.iLike]: `%${targetAudience}%` } },
-            ],
-          },
-          attributes: ['id'],
-        });
+    } else if (String(targetAudience).toLowerCase() === 'standalone') {
+      // Find all standalone courses (courses with no levelCode or NONE or blank)
+      const standaloneCourses = await Course.findAll({
+        where: {
+          [Op.or]: [
+            { levelCode: null },
+            { levelCode: 'NONE' },
+            { levelCode: '' },
+          ],
+        },
+        attributes: ['id'],
+      });
+      const standaloneCourseIds = standaloneCourses.map((c: any) => c.id);
+
+      // Find students enrolled in standalone courses or with standalone/course in membership
+      const userCourses = await UserCourse.findAll({
+        where: {
+          courseId: { [Op.in]: standaloneCourseIds },
+        },
+        attributes: ['userId'],
+        raw: true,
+      });
+      const enrolledUserIds = Array.from(new Set(userCourses.map((uc: any) => uc.userId).filter(Boolean)));
+
+      const orConditions: any[] = [
+        { membershipLevel: { [Op.iLike]: '%standalone%' } },
+        { membershipLevel: { [Op.iLike]: '%masterclass%' } },
+        { membershipLevel: { [Op.iLike]: '%course%' } },
+      ];
+      if (enrolledUserIds.length > 0) {
+        orConditions.push({ id: { [Op.in]: enrolledUserIds } });
       }
+
+      targetUsers = await User.findAll({
+        where: {
+          role: 'student',
+          [Op.or]: orConditions,
+        },
+        attributes: ['id'],
+      });
+    } else if (String(targetAudience).toLowerCase().startsWith('course_')) {
+      const courseId = targetAudience.replace(/^course_/i, '');
+      const userCourses = await UserCourse.findAll({
+        where: { courseId },
+        attributes: ['userId'],
+        raw: true,
+      });
+      const enrolledUserIds = Array.from(new Set(userCourses.map((uc: any) => uc.userId).filter(Boolean)));
+      targetUsers = await User.findAll({
+        where: {
+          role: 'student',
+          id: { [Op.in]: enrolledUserIds },
+        },
+        attributes: ['id'],
+      });
     } else if (targetAudience === 'general') {
-      // Students who have GENERAL, null, empty, or no L0, L1, L2, L3 level
+      // Students who have GENERAL, null, empty, or no specific level
       targetUsers = await User.findAll({
         where: {
           role: 'student',
@@ -928,14 +959,6 @@ export const broadcastNotification = async (req: AuthRequest, res: Response): Pr
             { membershipLevel: null },
             { membershipLevel: '' },
             { membershipLevel: { [Op.iLike]: '%general%' } },
-            {
-              [Op.and]: [
-                { membershipLevel: { [Op.notILike]: '%L0%' } },
-                { membershipLevel: { [Op.notILike]: '%L1%' } },
-                { membershipLevel: { [Op.notILike]: '%L2%' } },
-                { membershipLevel: { [Op.notILike]: '%L3%' } },
-              ],
-            },
           ],
         },
         attributes: ['id'],
@@ -965,6 +988,18 @@ export const broadcastNotification = async (req: AuthRequest, res: Response): Pr
         where: {
           role: 'student',
           [Op.or]: orConditions,
+        },
+        attributes: ['id'],
+      });
+    } else {
+      // Dynamic level check: targetAudience is any configured level code (e.g. L0, L1, L2, L3, L3+, L4, L6, etc.)
+      targetUsers = await User.findAll({
+        where: {
+          role: 'student',
+          [Op.or]: [
+            { membershipLevel: targetAudience },
+            { membershipLevel: { [Op.iLike]: `%${targetAudience}%` } },
+          ],
         },
         attributes: ['id'],
       });

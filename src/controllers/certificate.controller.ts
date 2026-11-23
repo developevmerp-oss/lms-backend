@@ -80,3 +80,36 @@ export const awardCertificate = async (req: Request, res: Response): Promise<any
     res.status(500).json({ message: 'Internal server error', error: error?.message });
   }
 };
+
+// Update an existing certificate (Admin)
+export const updateCertificate = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const { id } = req.params;
+    const { title, pdfUrl, certificateUrl, studentName } = req.body;
+
+    const cert = await Certificate.findByPk(id);
+    if (!cert) {
+      return res.status(404).json({ message: 'Certificate not found' });
+    }
+
+    const finalUrl = pdfUrl || certificateUrl || cert.certificateUrl;
+    await cert.update({
+      title: title || cert.title,
+      certificateUrl: finalUrl,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    if (studentName && cert.studentId) {
+      const student = await User.findByPk(cert.studentId);
+      if (student && student.name !== studentName) {
+        await student.update({ name: studentName });
+      }
+    }
+
+    res.status(200).json({ message: 'Certificate updated successfully', certificate: cert });
+  } catch (error: any) {
+    console.error('Error updating certificate:', error);
+    res.status(500).json({ message: 'Internal server error', error: error?.message });
+  }
+};
