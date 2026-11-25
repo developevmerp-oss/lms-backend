@@ -84,12 +84,12 @@ export const reviewPortfolio = async (req: AuthRequest, res: Response): Promise<
       professionalQuality: skillScores.professionalQuality ?? userSkill.professionalQuality,
     });
 
-    // Add some XP for the review!
+    // Add some XP for the review (50 XP)
     const user = await User.findByPk(portfolio.userId);
     if (user) {
       await user.update({
-        xpPoints: (user.xpPoints || 0) + 500,
-        points: (user.points || 0) + 500
+        xpPoints: (user.xpPoints || 0) + 50,
+        points: (user.points || 0) + 50
       });
     }
 
