@@ -24,7 +24,10 @@ export const siteUrl = (): string => (process.env.FRONTEND_URL || 'https://ravis
 export const emailLogoUrl = (): string => {
   const custom = (process.env.EMAIL_LOGO_URL || '').trim();
   if (custom) return custom;
-  const site = siteUrl().replace(/^(https?:\/\/)(ravishingarthub\.com)/i, '$1www.$2');
+  // A localhost address can never be loaded by Gmail / Outlook, so while testing locally still use the live logo.
+  const site = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])/i.test(siteUrl())
+    ? 'https://www.ravishingarthub.com'
+    : siteUrl().replace(/^(https?:\/\/)(ravishingarthub\.com)/i, '$1www.$2');
   return `${site}/favicon.png`;
 };
 
@@ -90,26 +93,18 @@ export function buildWelcomeEmail(input: WelcomeEmailInput): { subject: string; 
           </td>
         </tr>
 
-        <!-- Credentials card -->
+        <!-- Login details (simple list) -->
         <tr>
-          <td style="padding:24px 36px 6px;">
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#fff2ea;border:1px solid #fbdcd0;border-radius:16px;">
+          <td style="padding:22px 36px 4px;font-family:Arial,Helvetica,sans-serif;">
+            <div style="font-size:16px;line-height:22px;font-weight:700;color:#1c1917;margin-bottom:10px;">Your login details</div>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #ecdccb;border-bottom:1px solid #ecdccb;">
               <tr>
-                <td style="padding:22px 24px 8px;font-family:Arial,Helvetica,sans-serif;">
-                  <div style="font-size:11.5px;line-height:16px;letter-spacing:2px;font-weight:700;color:#942008;text-transform:uppercase;">Your login details</div>
-                </td>
+                <td width="38%" valign="top" style="padding:13px 10px 13px 0;border-bottom:1px solid #f3e8dc;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:21px;color:#78716c;">User ID (your email)</td>
+                <td valign="top" style="padding:13px 0;border-bottom:1px solid #f3e8dc;font-family:Arial,Helvetica,sans-serif;font-size:14.5px;line-height:21px;font-weight:700;color:#1c1917;word-break:break-all;">${email}</td>
               </tr>
               <tr>
-                <td style="padding:6px 24px 4px;font-family:Arial,Helvetica,sans-serif;">
-                  <div style="font-size:12px;line-height:18px;color:#78716c;margin-bottom:5px;">User ID (your email)</div>
-                  <div style="background-color:#ffffff;border:1px solid #ecdccb;border-radius:10px;padding:13px 14px;font-family:Arial,Helvetica,sans-serif;letter-spacing:0.4px;font-size:15.5px;line-height:22px;font-weight:700;color:#1c1917;word-break:break-all;">${email}</div>
-                </td>
-              </tr>
-              <tr>
-                <td style="padding:14px 24px 24px;font-family:Arial,Helvetica,sans-serif;">
-                  <div style="font-size:12px;line-height:18px;color:#78716c;margin-bottom:5px;">Password</div>
-                  <div style="background-color:#ffffff;border:1px solid #ecdccb;border-radius:10px;padding:13px 14px;font-family:Arial,Helvetica,sans-serif;letter-spacing:0.4px;font-size:15.5px;line-height:22px;font-weight:700;color:#c4431d;word-break:break-all;">${password}</div>
-                </td>
+                <td width="38%" valign="top" style="padding:13px 10px 13px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:21px;color:#78716c;">Password</td>
+                <td valign="top" style="padding:13px 0;font-family:Arial,Helvetica,sans-serif;font-size:14.5px;line-height:21px;font-weight:700;color:#942008;word-break:break-all;">${password}</td>
               </tr>
             </table>
           </td>

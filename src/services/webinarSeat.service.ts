@@ -1,7 +1,7 @@
 import { Op } from 'sequelize';
 import WebinarRegistration from '../models/webinarRegistration';
 import WebinarEvent from '../models/webinarEvent';
-import { sendWebinarRegistrationEmails } from './webinarEmail';
+import { sendWebinarRegistrationEmail } from './webinarEmail';
 
 export const DEFAULT_WEBINAR_TITLE = 'Resin Mastery Masterclass — Live with Vrajangna Patel';
 export const DEFAULT_WHATSAPP_URL = 'https://chat.whatsapp.com/sample-art-webinar-vip';
@@ -19,7 +19,6 @@ export type SeatInput = {
 /**
  * Reserves a webinar seat for a person (creating or updating their WebinarRegistration) and returns the
  * webinar they were booked on. Shared by the public webinar form and the student sign-up flow.
- * `alreadyRegistered` is true when this person already held a seat for that same webinar before this call.
  */
 export async function reserveWebinarSeat(input: SeatInput) {
   const cleanEmail = input.email.trim().toLowerCase();
@@ -53,7 +52,6 @@ export async function reserveWebinarSeat(input: SeatInput) {
   if (cleanPhone) matchers.push({ phone: cleanPhone });
 
   let registration = await WebinarRegistration.findOne({ where: { [Op.or]: matchers } });
-  const alreadyRegistered = Boolean(registration && targetEventId && registration.webinarEventId === targetEventId);
 
   if (registration) {
     await registration.update({
@@ -75,16 +73,13 @@ export async function reserveWebinarSeat(input: SeatInput) {
     } as any);
   }
 
-  return { registration, activeEvent, alreadyRegistered };
+  return { registration, activeEvent };
 }
 
-/** Sends the webinar emails (registration confirmation, then join link) for a reserved seat. Never throws. */
-export function sendSeatEmails(
-  seat: { registration: WebinarRegistration; activeEvent: any; alreadyRegistered: boolean },
-  opts: { skipRegistrationEmailIfAlreadyRegistered?: boolean } = {}
-): Promise<{ registration: boolean; join: boolean }> {
-  const { registration, activeEvent, alreadyRegistered } = seat;
-  return sendWebinarRegistrationEmails({
+/** Sends the single webinar registration email (confirmation + join link + login button). Never throws. */
+export function sendSeatEmails(seat: { registration: WebinarRegistration; activeEvent: any }): Promise<boolean> {
+  const { registration, activeEvent } = seat;
+  return sendWebinarRegistrationEmail({
     name: registration.name,
     email: registration.email,
     webinarTitle: activeEvent?.title || DEFAULT_WEBINAR_TITLE,
@@ -93,6 +88,5 @@ export function sendSeatEmails(
     zoomJoinUrl: activeEvent?.zoomJoinUrl || null,
     whatsappGroupUrl: activeEvent?.whatsappGroupUrl || DEFAULT_WHATSAPP_URL,
     prepVideoUrl: activeEvent?.prepVideoUrl || null,
-    skipRegistrationEmail: Boolean(opts.skipRegistrationEmailIfAlreadyRegistered && alreadyRegistered),
   });
 }
