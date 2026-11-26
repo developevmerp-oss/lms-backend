@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import WebinarRegistration from '../models/webinarRegistration';
 import WebinarEvent from '../models/webinarEvent';
 import { Op } from 'sequelize';
+import { reserveWebinarSeat, sendSeatEmails, DEFAULT_WHATSAPP_URL, DEFAULT_WEBINAR_TITLE } from '../services/webinarSeat.service';
 
 // Helper to format relative time
 function formatRelativeTime(date: Date): string {
@@ -137,61 +138,22 @@ export const registerLead = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanPhone = phone.trim();
-
-    let targetEventId = webinarEventId;
-    let activeEvent: any = null;
-
-    if (targetEventId) {
-      activeEvent = await WebinarEvent.findByPk(targetEventId as string);
-      // If event is expired in the past or inactive, discard and auto-find next upcoming future event
-      if (!activeEvent || !activeEvent.isActive || new Date(activeEvent.scheduledAt).getTime() <= Date.now()) {
-        activeEvent = null;
-        targetEventId = null;
-      }
-    }
-
-    if (!activeEvent) {
-      activeEvent = await WebinarEvent.findOne({
-        where: {
-          isActive: true,
-          scheduledAt: { [Op.gt]: new Date() },
-          status: { [Op.ne]: 'completed' },
-        },
-        order: [['scheduledAt', 'ASC']],
-      });
-      if (activeEvent) targetEventId = activeEvent.id;
-    }
-
-    let registration = await WebinarRegistration.findOne({
-      where: {
-        [Op.or]: [{ email: cleanEmail }, { phone: cleanPhone }],
-      },
+    const { registration, activeEvent, alreadyRegistered } = await reserveWebinarSeat({
+      name,
+      email,
+      phone,
+      city,
+      challenge,
+      source: source || 'webinar-landing-page',
+      webinarEventId,
     });
 
-    if (registration) {
-      await registration.update({
-        name: name.trim(),
-        city: city || registration.city,
-        challenge: challenge || registration.challenge,
-        source: source || registration.source,
-        webinarEventId: targetEventId || registration.webinarEventId,
-      });
-    } else {
-      registration = await WebinarRegistration.create({
-        name: name.trim(),
-        email: cleanEmail,
-        phone: cleanPhone,
-        city: city || null,
-        challenge: challenge || null,
-        source: source || 'webinar-landing-page',
-        webinarEventId: targetEventId || null,
-      });
-    }
-
-    const whatsappUrl = activeEvent?.whatsappGroupUrl || 'https://chat.whatsapp.com/sample-art-webinar-vip';
+    const whatsappUrl = activeEvent?.whatsappGroupUrl || DEFAULT_WHATSAPP_URL;
     const zoomUrl = activeEvent?.zoomJoinUrl || 'Emailed directly to your registered address';
+
+    // Email 1: registration confirmation, then Email 2: webinar join link (sent in this order).
+    // Fire-and-forget so a slow or failing mail service never delays or breaks the registration.
+    sendSeatEmails({ registration, activeEvent, alreadyRegistered }).catch(() => {});
 
     res.status(200).json({
       success: true,
@@ -204,7 +166,7 @@ export const registerLead = async (req: Request, res: Response): Promise<void> =
         city: registration.city,
         whatsappGroupUrl: whatsappUrl,
         zoomLink: zoomUrl,
-        webinarTitle: activeEvent?.title || 'Resin Mastery Masterclass — Live with Vrajangna Patel',
+        webinarTitle: activeEvent?.title || DEFAULT_WEBINAR_TITLE,
         scheduledAt: activeEvent?.scheduledAt || null,
       },
     });
