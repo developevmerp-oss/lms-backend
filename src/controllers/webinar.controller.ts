@@ -138,7 +138,7 @@ export const registerLead = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    const { registration, activeEvent, alreadyRegistered } = await reserveWebinarSeat({
+    const { registration, activeEvent } = await reserveWebinarSeat({
       name,
       email,
       phone,
@@ -151,9 +151,9 @@ export const registerLead = async (req: Request, res: Response): Promise<void> =
     const whatsappUrl = activeEvent?.whatsappGroupUrl || DEFAULT_WHATSAPP_URL;
     const zoomUrl = activeEvent?.zoomJoinUrl || 'Emailed directly to your registered address';
 
-    // Email 1: registration confirmation, then Email 2: webinar join link (sent in this order).
+    // One email: successfully registered + webinar join link + login button.
     // Fire-and-forget so a slow or failing mail service never delays or breaks the registration.
-    sendSeatEmails({ registration, activeEvent, alreadyRegistered }).catch(() => {});
+    sendSeatEmails({ registration, activeEvent }).catch(() => {});
 
     res.status(200).json({
       success: true,
