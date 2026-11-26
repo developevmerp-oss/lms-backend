@@ -86,7 +86,7 @@ export function buildWelcomeEmail(input: WelcomeEmailInput): { subject: string; 
         <!-- Greeting -->
         <tr>
           <td style="padding:36px 36px 8px;font-family:Arial,Helvetica,sans-serif;">
-            <div style="font-family:Arial,Helvetica,sans-serif;font-size:30px;line-height:38px;font-weight:700;color:#1c1917;">Welcome aboard, ${name}! 🎨</div>
+            <div style="font-family:Arial,Helvetica,sans-serif;font-size:30px;line-height:38px;font-weight:700;color:#1c1917;">Welcome to Ravishing Art Hub, ${name}! 🎨</div>
             <p style="margin:14px 0 0;font-size:15.5px;line-height:25px;color:#57534e;">
               Your Ravishing Art Hub student account is ready. Everything you need to start your resin art journey is waiting inside &mdash; courses, live classes, rewards and a community of fellow artists.
             </p>
