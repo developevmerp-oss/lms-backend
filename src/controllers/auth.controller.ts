@@ -3,6 +3,8 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import db from '../models';
 import { sendPasswordResetOtpEmail } from '../services/email.service';
+import { sendStudentWelcomeEmail } from '../services/welcomeEmail';
+import { reserveWebinarSeat, sendSeatEmails } from '../services/webinarSeat.service';
 
 const { User, Skill } = db;
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey_change_in_production';
@@ -49,6 +51,29 @@ export const register = async (req: Request, res: Response): Promise<any> => {
     // Initialize default skills
     if (Skill) {
       await Skill.create({ userId: user.id, level: 'Beginner' }).catch(() => {});
+    }
+
+    // Welcome email with the student's User ID (email), password and the login link.
+    // Fire-and-forget: a slow or failing mail service must never block or break registration.
+    // Then, in this order: (2) webinar registration email - only if they are not already registered for the
+    // upcoming webinar - and (3) the webinar join-link email. The student is also booked a webinar seat so the
+    // webinar list / reminders include them.
+    if (user.role === 'student') {
+      (async () => {
+        await sendStudentWelcomeEmail({ name: user.name, email: user.email, password });
+        try {
+          const seat = await reserveWebinarSeat({
+            name: user.name,
+            email: user.email,
+            phone: user.phone,
+            city: user.city,
+            source: 'student-register-page',
+          });
+          await sendSeatEmails(seat, { skipRegistrationEmailIfAlreadyRegistered: true });
+        } catch (err) {
+          console.error('[register] webinar seat/email failed:', (err as Error).message);
+        }
+      })().catch(() => {});
     }
 
     // Generate instant authentication token

@@ -62,7 +62,8 @@ async function getTransporter(): Promise<Transporter | null> {
 }
 
 export function mailFrom(): string {
-  const customFrom = (process.env.SMTP_FROM || process.env.SMTP_USER || '').trim();
+  // EMAIL_FROM wins so Brevo always uses a sender that is verified in Brevo, e.g. "Ravishing Art <hello@yourdomain.com>"
+  const customFrom = (process.env.EMAIL_FROM || process.env.SMTP_FROM || process.env.SMTP_USER || '').trim();
   return customFrom || 'Ravishing Art Hub <noreply@ravishingarthub.com>';
 }
 
