@@ -4,6 +4,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { Op } from 'sequelize';
 import db from '../models';
+import { sendStudentWelcomeEmail } from '../services/welcomeEmail';
 
 const { User, SalesRecord, Notification, CommunityWin, LevelTier, PaymentTransaction, Course, UserCourse, StudentInstallmentPlan } = db;
 
@@ -473,6 +474,9 @@ export const verifyPayment = async (req: Request, res: Response): Promise<any> =
           points: 100,
           streak: 1,
         });
+
+        // New account created automatically after a purchase: email the login details (fire-and-forget)
+        sendStudentWelcomeEmail({ name: user.name, email: user.email, password: defaultPwd }).catch(() => {});
       }
     }
 
